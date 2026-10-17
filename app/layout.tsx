@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, Geist_Mono } from "next/font/google";
+import { Mona_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { OfflineBanner } from "@/components/offline-banner";
+import { Header } from "@/components/header"; // <--- Import your global Header component
 
-const inter = Inter({
+const monaSans = Mona_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
   display: "swap",
@@ -22,16 +23,22 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="en" className={`${monaSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <OfflineBanner/>
+        <OfflineBanner />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          {/* Global Header rendered across all pages */}
+          <Header />
+
+          {/* Page Content */}
+          <div className="flex-1">
+            {children}
+          </div>
         </ThemeProvider>
       </body>
     </html>
