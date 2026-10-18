@@ -1,14 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-export const supabaseReviews = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
+'use server';
+import { createClient } from '@/utils/supabase/server';
 
 export interface Review {
   id: string;
@@ -21,7 +12,8 @@ export interface Review {
 
 export async function listPropertyReviews(propertyId: string) {
   try {
-    const { data: reviews, error } = await supabaseReviews
+    const supabase = await createClient();
+    const { data: reviews, error } = await supabase
       .from('reviews')
       .select('*')
       .eq('property_id', propertyId)
@@ -58,7 +50,8 @@ export async function getPropertyReviewStats(propertyId: string) {
 
 export async function getPropertyRatingSummary(propertyId: string) {
   try {
-    const { data: reviews, error } = await supabaseReviews
+    const supabase = await createClient();
+    const { data: reviews, error } = await supabase
       .from('reviews')
       .select('rating')
       .eq('property_id', propertyId);

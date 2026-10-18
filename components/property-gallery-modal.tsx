@@ -79,6 +79,7 @@ export function PropertyGalleryModal({ images, isOpen, onClose, initialIndex = 0
             fill
             className="object-contain"
             priority
+            sizes="100vw"
           />
         </div>
 
@@ -101,7 +102,7 @@ export function PropertyGalleryModal({ images, isOpen, onClose, initialIndex = 0
               currentIndex === idx ? 'border-accent scale-105' : 'border-transparent opacity-60 hover:opacity-100'
             }`}
           >
-            <Image src={img} alt={`Thumbnail ${idx + 1}`} fill className="object-cover" />
+            <Image src={img} alt={`Thumbnail ${idx + 1}`} sizes="(max-width: 640px) 25vw, (max-width: 1024px) 15vw, 100px" fill className="object-cover" />
           </button>
         ))}
       </div>

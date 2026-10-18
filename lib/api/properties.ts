@@ -1,14 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-// Use service role key on the server if available to bypass RLS restrictions safely
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-export const supabasePublic = createClient(supabaseUrl, supabaseKey);
+'use server';
+import { createClient } from '@/utils/supabase/server';
 
 export async function listProperties() {
   try {
-    const { data: properties, error } = await supabasePublic
+    const supabase = await createClient();
+    const { data: properties, error } = await supabase
       .from('properties')
       .select(`
         *,
@@ -39,8 +35,10 @@ export async function listProperties() {
 
 export async function getPropertyById(id: string) {
   try {
+    const supabase = await createClient();
+
     // 1. Fetch property details and media
-    const { data: property, error } = await supabasePublic
+    const { data: property, error } = await supabase
       .from('properties')
       .select(`
         *,
@@ -57,7 +55,7 @@ export async function getPropertyById(id: string) {
     // 2. Fetch host profile strictly using host_id
     let hostData = null;
     if (property.host_id) {
-      const { data: profile, error: profileError } = await supabasePublic
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', property.host_id)
@@ -67,7 +65,6 @@ export async function getPropertyById(id: string) {
         console.error(`Profile fetch error for host_id ${property.host_id}:`, profileError.message);
       } else {
         hostData = profile;
-        console.log('Successfully fetched host profile:', hostData?.full_name);
       }
     }
 

@@ -1,16 +1,19 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import Image from 'next/image';
-import { LayoutGrid } from 'lucide-react';
-import { PropertyGalleryModal } from './property-gallery-modal';
+import React, { useState } from "react";
+import Image from "next/image";
+import { LayoutGrid } from "lucide-react";
+import { PropertyGalleryModal } from "./property-gallery-modal";
 
 interface GalleryWrapperProps {
   gallery: string[];
   title: string;
 }
 
-export function PropertyGalleryWrapper({ gallery, title }: GalleryWrapperProps) {
+export function PropertyGalleryWrapper({
+  gallery,
+  title,
+}: GalleryWrapperProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -23,7 +26,6 @@ export function PropertyGalleryWrapper({ gallery, title }: GalleryWrapperProps) 
     <>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 h-[320px] sm:h-[450px] rounded-3xl overflow-hidden border border-border cursor-pointer">
-
           {/* Main Large Image */}
           <div
             onClick={() => handleOpen(0)}
@@ -34,6 +36,7 @@ export function PropertyGalleryWrapper({ gallery, title }: GalleryWrapperProps) 
               alt={title}
               fill
               priority
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 66vw, 50vw"
               className="object-cover group-hover:scale-105 transition-transform duration-500"
             />
           </div>
@@ -46,7 +49,13 @@ export function PropertyGalleryWrapper({ gallery, title }: GalleryWrapperProps) 
                 onClick={() => handleOpen(idx + 1)}
                 className="relative h-full bg-muted group overflow-hidden"
               >
-                <Image src={img} alt={`Gallery ${idx + 2}`} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                <Image
+                  src={img}
+                  alt={`Gallery ${idx + 2}`}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                />
               </div>
             ))}
 
@@ -59,7 +68,6 @@ export function PropertyGalleryWrapper({ gallery, title }: GalleryWrapperProps) 
               <span>+ View Gallery</span>
             </div>
           </div>
-
         </div>
       </div>
 

@@ -1,9 +1,7 @@
 import { Suspense } from "react";
 import { headers } from "next/headers";
-import { Header } from "@/components/header";
 import { ExploreFeed } from "@/components/explore-feed";
 import { listProperties } from "@/lib/api/properties";
-import { Hero } from "@/components/hero";
 
 // Loading skeleton fallback while properties stream in
 function ExploreFeedLoading() {

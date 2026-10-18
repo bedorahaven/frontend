@@ -1,11 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+'use server';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-export const supabaseBookings = createClient(supabaseUrl, supabaseKey, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+import { createClient } from '@/utils/supabase/server';
 
 export interface Booking {
   id: string;
@@ -22,7 +17,8 @@ export interface Booking {
 // Fetch all confirmed check-in and check-out ranges for a property to disable dates on the calendar
 export async function getPropertyBookedDates(propertyId: string) {
   try {
-    const { data, error } = await supabaseBookings
+    const supabase = await createClient();
+    const { data, error } = await supabase
       .from('bookings')
       .select('check_in, check_out')
       .eq('property_id', propertyId)
@@ -52,9 +48,8 @@ export async function createBooking(payload: {
   guest_name?: string;
 }) {
   try {
-    // 1. Create guest profile or use a guest placeholder ID if unauthenticated
-    // For quick guest checkout without login, we insert or use a guest phone reference
-    const { data, error } = await supabaseBookings
+    const supabase = await createClient();
+    const { data, error } = await supabase
       .from('bookings')
       .insert({
         property_id: payload.property_id,
