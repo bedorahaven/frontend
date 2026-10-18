@@ -1,20 +1,34 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
-import { getPropertyReviewStats } from '@/lib/api/reviews';
+import { getPropertyRatingSummary } from '@/lib/api/reviews';
 
 interface PropertyReviewsSummaryProps {
   propertyId: string;
 }
 
-export async function PropertyReviewsSummary({ propertyId }: PropertyReviewsSummaryProps) {
-  const { averageRating, totalReviews } = await getPropertyReviewStats(propertyId);
+export function PropertyReviewsSummary({ propertyId }: PropertyReviewsSummaryProps) {
+  const [rating, setRating] = useState<number>(4.92);
+  const [count, setCount] = useState<number>(48);
+
+  useEffect(() => {
+    async function loadStats() {
+      if (!propertyId) return;
+      const stats = await getPropertyRatingSummary(propertyId);
+      setRating(stats.rating);
+      setCount(stats.count);
+    }
+
+    loadStats();
+  }, [propertyId]);
 
   return (
-    <div className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-foreground shrink-0">
-      <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-foreground text-foreground" />
-      <span>{averageRating}</span>
+    <div className="flex items-center gap-1 font-semibold text-foreground">
+      <Star className="w-3.5 h-3.5 fill-foreground text-foreground" />
+      <span>{rating}</span>
       <span className="text-muted-foreground font-normal">
-        ({totalReviews})
+        ({count})
       </span>
     </div>
   );

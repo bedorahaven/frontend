@@ -1,8 +1,6 @@
 import { listProperties } from '@/lib/api/properties';
 import { ExploreFeed } from '@/components/explore-feed';
 
-// Removed legacy revalidate export for Next.js 16 compatibility
-
 export default async function PropertiesPage() {
   const properties = await listProperties();
 

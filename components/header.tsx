@@ -10,7 +10,6 @@ import {
   User,
   Moon,
   Sun,
-  Globe,
   Heart,
   MessageSquare,
   Calendar,
@@ -18,7 +17,6 @@ import {
   Home,
   X,
   MapPin,
-  Users,
   Minus,
   Plus
 } from 'lucide-react';
@@ -192,7 +190,7 @@ export function Header() {
                   <div className="py-1">
                     <Link href="/host" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-muted transition-colors">
                       <Home className="w-4 h-4 text-muted-foreground" />
-                      <span>Bedora your home</span>
+                      <span>Become a host</span>
                     </Link>
                     <Link href="/help" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-muted transition-colors">
                       <HelpCircle className="w-4 h-4 text-muted-foreground" />

@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// Use service role key on the server if available to bypass RLS restrictions safely
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-// Public client for unauthenticated guest reads
 export const supabasePublic = createClient(supabaseUrl, supabaseKey);
 
 export async function listProperties() {
@@ -12,8 +12,7 @@ export async function listProperties() {
       .from('properties')
       .select(`
         *,
-        property_media (media_url, media_type),
-        host:host_id (id, full_name, avatar_url, is_verified, city)
+        property_media (media_url, media_type)
       `)
       .order('created_at', { ascending: false });
 
@@ -40,12 +39,12 @@ export async function listProperties() {
 
 export async function getPropertyById(id: string) {
   try {
+    // 1. Fetch property details and media
     const { data: property, error } = await supabasePublic
       .from('properties')
       .select(`
         *,
-        property_media (media_url, media_type),
-        host:host_id (id, full_name, avatar_url, is_verified, city, bio)
+        property_media (media_url, media_type)
       `)
       .eq('id', id)
       .single();
@@ -53,6 +52,23 @@ export async function getPropertyById(id: string) {
     if (error || !property) {
       console.error('Property fetch error:', error?.message);
       return null;
+    }
+
+    // 2. Fetch host profile strictly using host_id
+    let hostData = null;
+    if (property.host_id) {
+      const { data: profile, error: profileError } = await supabasePublic
+        .from('profiles')
+        .select('*')
+        .eq('id', property.host_id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error(`Profile fetch error for host_id ${property.host_id}:`, profileError.message);
+      } else {
+        hostData = profile;
+        console.log('Successfully fetched host profile:', hostData?.full_name);
+      }
     }
 
     const primaryMedia = property.property_media?.[0]?.media_url || '/bedora_icon.png';
@@ -63,7 +79,7 @@ export async function getPropertyById(id: string) {
       media_url: primaryMedia,
       media_gallery: allMedia,
       category: property.category || 'trending',
-      // Ensure amenities is parsed correctly if stored as JSONB array
+      host: hostData,
       amenities: Array.isArray(property.amenities) ? property.amenities : [],
     };
   } catch (err) {

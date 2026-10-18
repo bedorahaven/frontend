@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { OfflineBanner } from "@/components/offline-banner";
 import { Header } from "@/components/header"; // <--- Import your global Header component
+import { Hero } from "@/components/hero";
 
 const monaSans = Mona_Sans({
   variable: "--font-sans",
@@ -21,9 +22,17 @@ export const metadata: Metadata = {
   description: "Book unique places to stay and things to do.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" className={`${monaSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${monaSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <OfflineBanner />
         <ThemeProvider
@@ -34,11 +43,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           {/* Global Header rendered across all pages */}
           <Header />
+          
 
           {/* Page Content */}
-          <div className="flex-1">
-            {children}
-          </div>
+          <div className="flex-1">{children}</div>
         </ThemeProvider>
       </body>
     </html>
