@@ -3,8 +3,8 @@ import { Mona_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { OfflineBanner } from "@/components/offline-banner";
-import { Header } from "@/components/header"; // <--- Import your global Header component
-import { Hero } from "@/components/hero";
+import { Header } from "@/components/header";
+import { Toaster } from "react-hot-toast";
 
 const monaSans = Mona_Sans({
   variable: "--font-sans",
@@ -41,9 +41,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <Toaster position="top-center" />
           {/* Global Header rendered across all pages */}
           <Header />
-          
+
 
           {/* Page Content */}
           <div className="flex-1">{children}</div>
