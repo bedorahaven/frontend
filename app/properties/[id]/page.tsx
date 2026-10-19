@@ -29,11 +29,7 @@ async function PropertyDetailContent({ params }: { params: Promise<{ id: string 
   if (!property) {
     notFound();
   }
-
-  const price = Number(property.price_per_night || 0);
-  const cleaningFee = Number(property.cleaning_fee || 0);
-  const serviceFee = 1500;
-  const total = price + cleaningFee + serviceFee;
+  
   const gallery = property.media_gallery || [property.media_url];
   const host = property.host || {};
 

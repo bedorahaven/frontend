@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Smartphone, CheckCircle2, Loader2, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
+import { Smartphone, CheckCircle2, Loader2, Calendar as CalendarIcon, ChevronDown, Users } from 'lucide-react';
 // import { format, differenceInDays, parseISO, DateRange } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { format, differenceInDays, parseISO } from 'date-fns';
@@ -202,7 +202,10 @@ export function PropertyBookingWidget({ property }: PropertyBookingWidgetProps) 
             <label className="block text-[11px] font-bold tracking-wider uppercase text-muted-foreground">Guests</label>
             <Select value={guestsCount} onValueChange={(val) => setGuestsCount(val || '1')}>
               <SelectTrigger className="!h-11 w-full px-3.5 rounded-xl border-border bg-muted/30 hover:bg-muted/50 text-xs font-semibold text-foreground flex items-center justify-between">
-                <SelectValue placeholder="Guests" />
+                <div className="flex items-center gap-2.5 text-xs truncate">
+                  <Users className="w-4 h-4 text-accent shrink-0" />
+                  <SelectValue placeholder="Guests" />
+                </div>
               </SelectTrigger>
               <SelectContent className="bg-popover border border-border rounded-xl shadow-xl z-50">
                 {Array.from({ length: maxGuests }, (_, i) => i + 1).map((num) => (
@@ -218,8 +221,9 @@ export function PropertyBookingWidget({ property }: PropertyBookingWidgetProps) 
           <div className="space-y-1.5">
             <label className="block text-[11px] font-bold tracking-wider uppercase text-muted-foreground">M-Pesa Phone</label>
             <InputGroup className="!h-11 w-full rounded-xl border border-border bg-muted/30 px-3 hover:bg-muted/50 transition-colors flex items-center">
-              <InputGroupAddon align="inline-start" className="text-xs font-bold text-muted-foreground pr-1 select-none">
-                +254
+              <InputGroupAddon align="inline-start" className="text-xs font-bold text-muted-foreground pr-1.5 select-none flex items-center gap-1.5">
+                <span className="text-sm leading-none">🇰🇪</span>
+                <span>+254</span>
               </InputGroupAddon>
               <InputGroupInput
                 type="tel"
