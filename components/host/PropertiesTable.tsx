@@ -15,6 +15,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Building2,
   Plus,
   Search,
@@ -41,17 +49,11 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [deletingPropertyId, setDeletingPropertyId] = useState<string | null>(null);
+  const [propertyToDelete, setPropertyToDelete] =
+    useState<PropertyWithMedia | null>(null);
   const pageSize = 5;
 
   const handleDelete = async (property: PropertyWithMedia) => {
-    if (
-      !window.confirm(
-        `Delete "${property.title}"? This will permanently remove the listing and its media records.`,
-      )
-    ) {
-      return;
-    }
-
     setDeletingPropertyId(property.id);
     try {
       const result = await deleteProperty(property.id);
@@ -62,6 +64,7 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
 
       toast.success("Listing deleted.");
       if (result.warning) toast.error(result.warning);
+      setPropertyToDelete(null);
       router.refresh();
     } catch (error) {
       console.error("Listing deletion failed:", error);
@@ -125,6 +128,7 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
   }
 
   return (
+    <>
     <div className="space-y-4">
       {/* Search Filter Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -253,7 +257,7 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
                           type="button"
                           variant="outline"
                           size="icon"
-                          onClick={() => void handleDelete(property)}
+                          onClick={() => setPropertyToDelete(property)}
                           disabled={deletingPropertyId === property.id}
                           aria-label={`Delete ${property.title}`}
                           title="Delete listing"
@@ -308,5 +312,54 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
         </div>
       </div>
     </div>
+    <Dialog
+      open={propertyToDelete !== null}
+      onOpenChange={(open) => {
+        if (!open && deletingPropertyId === null) setPropertyToDelete(null);
+      }}
+    >
+      <DialogContent
+        showCloseButton={deletingPropertyId === null}
+      >
+        <DialogHeader>
+          <DialogTitle>Delete listing?</DialogTitle>
+          <DialogDescription>
+            {propertyToDelete
+              ? `Delete "${propertyToDelete.title}"? This will permanently remove the listing and its media records.`
+              : "This will permanently remove the listing and its media records."}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={deletingPropertyId !== null}
+            onClick={() => setPropertyToDelete(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={
+              propertyToDelete === null || deletingPropertyId !== null
+            }
+            onClick={() => {
+              if (propertyToDelete) void handleDelete(propertyToDelete);
+            }}
+          >
+            {deletingPropertyId !== null ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              "Delete listing"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

@@ -18,7 +18,7 @@ const navigationItems = [
   { href: "/host", label: "Dashboard", icon: Home },
   { href: "/host/listings", label: "Manage Listings", icon: Building2 },
   { href: "/host/reservations", label: "Reservations", icon: CalendarDays },
-  { href: "/host/earning", label: "Earnings", icon: Wallet },
+  { href: "/host/earnings", label: "Earnings", icon: Wallet },
   { href: "/host/messages", label: "Guest Messages", icon: MessageSquare },
   { href: "/host/help", label: "Help Center", icon: CircleHelp },
 ];
