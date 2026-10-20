@@ -25,7 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import toast from "react-hot-toast";
 import type {
   MediaType,
@@ -33,14 +32,15 @@ import type {
   PropertyWithMedia,
 } from "@/types/properties";
 import { createProperty, updateProperty } from "@/lib/api/properties";
+import { RichTextEditor } from "../ui/rich-text-editor";
 
-const CATEGORIES: { label: string; value: PropertyCategory }[] = [
+export const CATEGORIES: { label: string; value: PropertyCategory }[] = [
   { label: "Trending", value: "trending" },
-  { label: "Beachfront", value: "beachfront" },
-  { label: "Cabins", value: "cabins" },
-  { label: "Luxury", value: "luxury" },
-  { label: "Countryside", value: "countryside" },
-  { label: "Amazing Views", value: "amazing_views" },
+  { label: "Beachfront (Coast & Diani)", value: "beachfront" },
+  { label: "Bush & Safari Cabins", value: "cabins" },
+  { label: "Luxury Villas", value: "luxury" },
+  { label: "Upcountry & Rift Valley", value: "countryside" },
+  { label: "Nairobi Skyline Views", value: "amazing_views" },
 ];
 
 const COMMON_AMENITIES = [
@@ -127,7 +127,9 @@ export function ListingForm({
   const [uploadingMedia, setUploadingMedia] = useState(false);
 
   const [title, setTitle] = useState(initialProperty?.title ?? "");
-  const [description, setDescription] = useState(initialProperty?.description ?? "");
+  const [description, setDescription] = useState(
+    initialProperty?.description ?? "",
+  );
   const [category, setCategory] = useState<PropertyCategory>(
     initialProperty?.category ?? "trending",
   );
@@ -360,11 +362,7 @@ export function ListingForm({
       }));
 
       const result = initialProperty
-        ? await updateProperty(
-            initialProperty.id,
-            propertyInput,
-            mediaInput,
-          )
+        ? await updateProperty(initialProperty.id, propertyInput, mediaInput)
         : await createProperty(propertyInput, mediaInput);
 
       if (result.success) {
@@ -381,7 +379,6 @@ export function ListingForm({
             `Failed to ${initialProperty ? "update" : "create"} property.`,
         );
       }
-
     } catch (error) {
       console.error("Property save failed:", error);
       toast.error("Failed to save property. Please try again.");
@@ -441,21 +438,13 @@ export function ListingForm({
             </div>
 
             <div>
-              <label
-                htmlFor="property-description"
-                className="mb-1 block text-xs font-semibold"
-              >
+              <label className="mb-1 block text-xs font-semibold">
                 Description *
               </label>
-              <Textarea
-                id="property-description"
-                name="description"
+              <RichTextEditor
                 placeholder="Describe what makes your place special, neighborhood vibe..."
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                required
-                maxLength={5000}
-                className="text-xs min-h-32 resize-y"
+                onChange={setDescription}
               />
             </div>
 
@@ -926,8 +915,10 @@ export function ListingForm({
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 {initialProperty ? "Saving Changes..." : "Creating Property..."}
               </>
+            ) : initialProperty ? (
+              "Save Changes"
             ) : (
-              initialProperty ? "Save Changes" : "Publish Listing"
+              "Publish Listing"
             )}
           </Button>
         </div>
