@@ -16,6 +16,16 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Google Places address autocomplete
+
+Host listing address suggestions use the Google Maps JavaScript API Places library. Configure `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` and enable the Maps JavaScript API and Places API (New) in the associated Google Cloud project. Restrict the browser key by HTTP referrer and API before deploying.
+
+Google Maps Platform usage requires billing and compliance with its attribution, terms-of-use, privacy-policy, and Places content storage requirements. Review the [Places API policies](https://developers.google.com/maps/documentation/places/web-service/policies) before persisting or reusing data returned by Places.
+
+## Listing media uploads
+
+Listing media uploads use the configured Cloudinary unsigned upload preset for both `image/upload` and `video/upload`. Configure the preset and Cloudinary account to permit the supported image formats (including AVIF and HEIC/HEIF) and video formats (including MOV, MP4, and 3GP), and set upload limits appropriate for your account and hosting plan. Video thumbnails/previews and HEIC/HEIF image previews depend on Cloudinary accepting and transforming the uploaded assets.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

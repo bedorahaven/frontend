@@ -13,6 +13,7 @@ export interface Property {
   beds: number; // integer
   bathrooms: number; // numeric(3, 1)
   country: string; // text
+  state: string; // text
   city: string; // text
   address: string; // text
   latitude: number | null; // numeric(10, 8)
@@ -37,6 +38,7 @@ export interface PropertyInsertInput {
   beds?: number;
   bathrooms?: number;
   country: string;
+  state: string;
   city: string;
   address: string;
   latitude?: number;

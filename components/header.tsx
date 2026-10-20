@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { createClient } from "@/utils/supabase/client";
 import {
@@ -30,6 +30,7 @@ import { Profile } from "@/types/profile";
 
 export function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -89,7 +90,7 @@ export function Header() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [pathname, supabase]);
 
   // Track window scroll
   useEffect(() => {
