@@ -52,7 +52,7 @@ export default async function HostDashboardPage() {
 
   const formattedEarnings = new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: "KES",
   }).format(totalEarnings);
 
   const stats = [
@@ -66,7 +66,7 @@ export default async function HostDashboardPage() {
       title: "Active Booked Properties",
       value: activeBookedPropertiesCount,
       icon: BookmarkCheck,
-      description: "Properties with ongoing or future guest stays",
+      description: "Properties with ongoing guest stays",
     },
     {
       title: "Total Reservations",

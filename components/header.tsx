@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,7 +28,7 @@ import {
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import { Profile } from "@/types/profile";
 
-export function Header() {
+function HeaderContent() {
   const router = useRouter();
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
@@ -625,5 +625,13 @@ export function Header() {
         </div>
       )}
     </>
+  );
+}
+
+export function Header() {
+  return (
+    <Suspense fallback={<div className="h-20 w-full bg-background border-b border-border" />}>
+      <HeaderContent />
+    </Suspense>
   );
 }

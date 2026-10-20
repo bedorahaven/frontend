@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -13,18 +14,62 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Building2, Plus, Search, MapPin, CheckCircle2, XCircle, ArrowUpDown } from "lucide-react";
-import { PropertyWithMedia } from "@/types/properties";
+import {
+  Building2,
+  Plus,
+  Search,
+  MapPin,
+  CheckCircle2,
+  XCircle,
+  ArrowUpDown,
+  Eye,
+  Pencil,
+  Trash2,
+  Loader2,
+} from "lucide-react";
+import type { PropertyWithMedia } from "@/types/properties";
+import { deleteProperty } from "@/lib/api/properties";
+import toast from "react-hot-toast";
 
 interface PropertiesTableProps {
   properties: PropertyWithMedia[];
 }
 
 export function PropertiesTable({ properties }: PropertiesTableProps) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingPropertyId, setDeletingPropertyId] = useState<string | null>(null);
   const pageSize = 5;
+
+  const handleDelete = async (property: PropertyWithMedia) => {
+    if (
+      !window.confirm(
+        `Delete "${property.title}"? This will permanently remove the listing and its media records.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeletingPropertyId(property.id);
+    try {
+      const result = await deleteProperty(property.id);
+      if (!result.success) {
+        toast.error(result.error || "Unable to delete this listing.");
+        return;
+      }
+
+      toast.success("Listing deleted.");
+      if (result.warning) toast.error(result.warning);
+      router.refresh();
+    } catch (error) {
+      console.error("Listing deletion failed:", error);
+      toast.error("Unable to delete this listing. Please try again.");
+    } finally {
+      setDeletingPropertyId(null);
+    }
+  };
 
   // Filter and sort properties natively
   const filteredProperties = useMemo(() => {
@@ -105,7 +150,7 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
       </div>
 
       {/* Table Container */}
-      <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow className="border-border hover:bg-transparent">
@@ -135,7 +180,7 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
                   : "TRENDING";
                 const formattedPrice = new Intl.NumberFormat("en-US", {
                   style: "currency",
-                  currency: "USD",
+                  currency: "KES",
                 }).format(property.price_per_night || 0);
 
                 return (
@@ -185,12 +230,42 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
                       )}
                     </TableCell>
                     <TableCell className="py-3 text-xs text-right">
-                      <Link
-                        href={`/host/listings/${property.id}`}
-                        className="inline-flex h-8 items-center justify-center rounded-lg border border-border bg-background px-3 font-semibold shadow-sm transition-colors hover:bg-accent/10 hover:text-accent"
-                      >
-                        Manage
-                      </Link>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link
+                          href={`/host/listings/${property.id}/edit`}
+                          aria-label={`Edit ${property.title}`}
+                          title="Edit listing"
+                          className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition-colors hover:bg-accent/10 hover:text-accent"
+                        >
+                          <Pencil className="size-4" />
+                        </Link>
+                        <Link
+                          href={`/properties/${property.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`View ${property.title} in a new tab`}
+                          title="View listing"
+                          className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition-colors hover:bg-accent/10 hover:text-accent"
+                        >
+                          <Eye className="size-4" />
+                        </Link>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => void handleDelete(property)}
+                          disabled={deletingPropertyId === property.id}
+                          aria-label={`Delete ${property.title}`}
+                          title="Delete listing"
+                          className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          {deletingPropertyId === property.id ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="size-4" />
+                          )}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

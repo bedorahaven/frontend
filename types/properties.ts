@@ -7,7 +7,6 @@ export interface Property {
   description: string; // text
   category: PropertyCategory; // public.property_category
   price_per_night: number; // numeric(10, 2)
-  cleaning_fee: number | null; // numeric(10, 2)
   max_guests: number; // integer
   bedrooms: number; // integer
   beds: number; // integer
@@ -32,7 +31,6 @@ export interface PropertyInsertInput {
   description: string;
   category?: PropertyCategory;
   price_per_night: number;
-  cleaning_fee?: number;
   max_guests?: number;
   bedrooms?: number;
   beds?: number;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -23,10 +23,40 @@ const navigationItems = [
   { href: "/host/help", label: "Help Center", icon: CircleHelp },
 ];
 
+function HostNavContent() {
+  const pathname = usePathname();
+
+  return (
+    <nav
+      aria-label="Host navigation"
+      className="flex flex-col gap-1 px-3 pt-5"
+    >
+      {navigationItems.map(({ href, label, icon: Icon }) => {
+        const isActive = pathname === href;
+
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={isActive ? "page" : undefined}
+            className={`flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+              isActive
+                ? "bg-accent/10 text-accent"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            <span>{label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 export default function HostLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const pathname = usePathname();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -42,30 +72,9 @@ export default function HostLayout({
     <div className="flex min-h-[calc(100vh-5rem)] flex-col md:flex-row">
       {/* Sidebar - Hidden on mobile, visible on desktop (md+) */}
       <aside className="hidden md:flex md:shrink-0 md:flex-col md:border-r md:border-border md:bg-card md:min-h-[calc(100vh-5rem)] md:w-64">
-        <nav
-          aria-label="Host navigation"
-          className="flex flex-col gap-1 px-3 pt-5"
-        >
-          {navigationItems.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href;
-
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={isActive ? "page" : undefined}
-                className={`flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-                  isActive
-                    ? "bg-accent/10 text-accent"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+        <Suspense fallback={<div className="p-4 text-xs text-muted-foreground">Loading menu...</div>}>
+          <HostNavContent />
+        </Suspense>
 
         <div className="px-3 pb-5 mt-auto">
           <button
@@ -80,7 +89,11 @@ export default function HostLayout({
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1">{children}</main>
+      <main className="min-w-0 flex-1">
+        <Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Loading...</div>}>
+          {children}
+        </Suspense>
+      </main>
     </div>
   );
 }
