@@ -2,9 +2,15 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/';
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get('code');
+  const next = requestUrl.searchParams.get('next') ?? '/';
+
+  // Production-safe origin resolution
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const host = forwardedHost || requestUrl.host;
+  const protocol = request.headers.get('x-forwarded-proto') || requestUrl.protocol.replace(':', '');
+  const origin = `${protocol}://${host}`;
 
   if (code) {
     const supabase = await createClient();
@@ -23,6 +29,7 @@ export async function GET(request: Request) {
 
         const isHostIntent = next.includes('/host');
 
+        // 1. If profile doesn't exist yet
         if (!profile) {
           if (isHostIntent) {
             await supabase.from('profiles').upsert({
@@ -34,15 +41,23 @@ export async function GET(request: Request) {
             });
             return NextResponse.redirect(`${origin}/host`);
           }
-          return NextResponse.redirect(`${origin}/onboarding`);
+
+          // Default new users without explicit host intent to guest onboarding / lookup
+          return NextResponse.redirect(`${origin}/lookup`);
         }
 
+        // 2. Host intent management
         if (isHostIntent && profile.role !== 'host') {
           return NextResponse.redirect(`${origin}/onboarding?role=host`);
         }
 
         if (profile.role === 'host') {
           return NextResponse.redirect(`${origin}/host`);
+        }
+
+        // 3. Authenticated guest routing requirement
+        if (profile.role === 'guest') {
+          return NextResponse.redirect(`${origin}/lookup`);
         }
       }
 

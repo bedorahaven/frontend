@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -16,11 +17,11 @@ function LoginForm() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    toast.loading('Redirecting to Google...', { id: 'google-auth' });
 
-    // Build target path based on role intent
     const targetPath = roleParam === 'host' ? '/host' : redirectTo;
 
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(targetPath)}`,
@@ -30,6 +31,11 @@ function LoginForm() {
         },
       },
     });
+
+    if (error) {
+      setLoading(false);
+      toast.error(error.message, { id: 'google-auth' });
+    }
   };
 
   return (
@@ -88,4 +94,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
