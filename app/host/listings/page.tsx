@@ -64,7 +64,7 @@ async function HostListingsContent() {
 
   const formattedEarnings = new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "KES",
+    currency: "KSh",
   }).format(totalEarnings);
 
   const stats = [

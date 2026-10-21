@@ -393,7 +393,7 @@ function formatPrice(value: number | string | null): string {
   if (!Number.isFinite(amount)) return "—";
   return new Intl.NumberFormat("en-KE", {
     style: "currency",
-    currency: "KES",
+    currency: "KSh",
     maximumFractionDigits: 0,
   }).format(amount);
 }

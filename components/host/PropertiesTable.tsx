@@ -184,7 +184,7 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
                   : "TRENDING";
                 const formattedPrice = new Intl.NumberFormat("en-US", {
                   style: "currency",
-                  currency: "KES",
+                  currency: "KSh",
                 }).format(property.price_per_night || 0);
 
                 return (
