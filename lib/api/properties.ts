@@ -35,6 +35,46 @@ export async function listProperties() {
   }
 }
 
+export async function listHostProperties() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) {
+    console.error('Host properties authentication error:', authError.message);
+    throw new Error('Unable to verify your host account.');
+  }
+
+  if (!user) {
+    throw new Error('You must be signed in to view your properties.');
+  }
+
+  const { data: properties, error } = await supabase
+    .from('properties')
+    .select(`
+      *,
+      property_media (media_url, media_type)
+    `)
+    .eq('host_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Host properties fetch error:', error.message);
+    throw new Error('Unable to load your properties.');
+  }
+
+  return (properties ?? []).map(property => {
+    const primaryMedia = property.property_media?.[0]?.media_url || '/bedora_icon.png';
+    return {
+      ...property,
+      media_url: primaryMedia,
+      category: property.category || 'trending',
+    };
+  });
+}
+
 export async function getPropertyById(id: string) {
   try {
     const supabase = await createClient();

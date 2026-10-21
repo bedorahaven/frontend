@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Building2, CalendarDays, Wallet, BookmarkCheck } from "lucide-react";
 import { PropertiesTable } from "@/components/host/PropertiesTable";
-import { listProperties } from "@/lib/api/properties";
+import { listHostProperties } from "@/lib/api/properties";
 
 export default function HostDashboardPage() {
   return (
@@ -31,7 +31,7 @@ async function HostDashboardContent() {
 
   // 2. Fetch properties and booking statistics concurrently
   const [properties, reservationsRes, activeBookingsRes, earningsRes] = await Promise.all([
-    listProperties(),
+    listHostProperties(),
     supabase
       .from("reservations")
       .select("*", { count: "exact", head: true })
@@ -63,7 +63,7 @@ async function HostDashboardContent() {
 
   const formattedEarnings = new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: "KES",
   }).format(totalEarnings);
 
   const stats = [
