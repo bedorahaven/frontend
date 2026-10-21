@@ -50,7 +50,7 @@ async function EarningsContent() {
 
   const currency =
     earnings.transactions.find((transaction) => transaction.currency)?.currency ??
-    "KES";
+    "KSh";
 
   return (
     <>

@@ -414,7 +414,7 @@ function formatAmount(amount: number, currency: string): string {
   if (!Number.isFinite(numericAmount)) return "—";
   return new Intl.NumberFormat("en-KE", {
     style: "currency",
-    currency: currency || "KES",
+    currency: currency || "KSh",
     maximumFractionDigits: 0,
   }).format(numericAmount);
 }
