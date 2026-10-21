@@ -31,13 +31,13 @@ type DateFilter = "all" | "30" | "90";
 
 interface TransactionsTableProps {
   transactions: HostEarningsTransaction[];
-  asOf: string;
 }
 
-export function TransactionsTable({ transactions, asOf }: TransactionsTableProps) {
+export function TransactionsTable({ transactions }: TransactionsTableProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [asOf, setAsOf] = useState<number | null>(null);
   const [page, setPage] = useState(1);
 
   const statuses = useMemo(
@@ -54,11 +54,10 @@ export function TransactionsTable({ transactions, asOf }: TransactionsTableProps
 
   const filteredTransactions = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const now = new Date(asOf).getTime();
     const dateCutoff =
-      dateFilter === "all"
+      dateFilter === "all" || asOf === null
         ? null
-        : now - Number(dateFilter) * 24 * 60 * 60 * 1000;
+        : asOf - Number(dateFilter) * 24 * 60 * 60 * 1000;
 
     return [...transactions]
       .filter((transaction) => {
@@ -120,6 +119,7 @@ export function TransactionsTable({ transactions, asOf }: TransactionsTableProps
   const updateDate = (value: string | null) => {
     if (value === "all" || value === "30" || value === "90") {
       setDateFilter(value);
+      setAsOf(value === "all" ? null : Date.now());
       setPage(1);
     }
   };

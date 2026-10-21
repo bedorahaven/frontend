@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { CalendarDays, Clock3 } from "lucide-react";
 import { ReservationsTable } from "@/components/host/ReservationsTable";
 import type {
@@ -15,7 +17,17 @@ interface ReservationRecord extends Record<string, unknown> {
   total_price: number | string | null;
 }
 
-export default async function HostReservationsPage() {
+export default function HostReservationsPage() {
+  return (
+    <Suspense fallback={<ReservationsLoading />}>
+      <HostReservationsContent />
+    </Suspense>
+  );
+}
+
+async function HostReservationsContent() {
+  await connection();
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -188,6 +200,20 @@ export default async function HostReservationsPage() {
 
       <ReservationsTable reservations={reservationRows} />
     </main>
+  );
+}
+
+function ReservationsLoading() {
+  return (
+    <div className="animate-pulse space-y-7 p-4 md:p-8" aria-label="Loading reservations">
+      <div className="h-12 w-64 rounded-xl bg-muted" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        {[...Array(2)].map((_, index) => (
+          <div key={index} className="h-32 rounded-2xl bg-muted" />
+        ))}
+      </div>
+      <div className="h-80 rounded-2xl bg-muted" />
+    </div>
   );
 }
 

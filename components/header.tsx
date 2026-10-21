@@ -260,6 +260,7 @@ function HeaderContent() {
                       src={avatarUrl}
                       alt={displayName}
                       fill
+                      sizes="28px"
                       className="object-cover"
                     />
                   ) : (

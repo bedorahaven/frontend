@@ -1,10 +1,25 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
+import { Suspense } from "react";
 import { Banknote, Building2, ReceiptText, CalendarCheck2 } from "lucide-react";
 import { TransactionsTable } from "@/components/host/TransactionsTable";
 import { getHostEarnings } from "@/lib/api/transactions";
 import type { HostEarningsData } from "@/lib/api/transactions";
 
-export default async function HostEarningsPage() {
+export default function HostEarningsPage() {
+  return (
+    <main className="space-y-7 p-4 md:p-8">
+      <PageHeading />
+      <Suspense fallback={<EarningsLoading />}>
+        <EarningsContent />
+      </Suspense>
+    </main>
+  );
+}
+
+async function EarningsContent() {
+  await connection();
+
   let earnings: HostEarningsData;
   try {
     earnings = await getHostEarnings();
@@ -16,16 +31,13 @@ export default async function HostEarningsPage() {
     }
     console.error("Host earnings page error:", error);
     return (
-      <main className="space-y-6 p-4 md:p-8">
-        <PageHeading />
-        <div
-          role="alert"
-          className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
-        >
-          Your earnings could not be loaded. Please refresh the page or try
-          again later.
-        </div>
-      </main>
+      <div
+        role="alert"
+        className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
+      >
+        Your earnings could not be loaded. Please refresh the page or try
+        again later.
+      </div>
     );
   }
 
@@ -41,9 +53,7 @@ export default async function HostEarningsPage() {
     "KES";
 
   return (
-    <main className="space-y-7 p-4 md:p-8">
-      <PageHeading />
-
+    <>
       <section aria-label="Earnings overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           label="Completed earnings"
@@ -81,9 +91,24 @@ export default async function HostEarningsPage() {
 
       <TransactionsTable
         transactions={earnings.transactions}
-        asOf={new Date().toISOString()}
       />
-    </main>
+    </>
+  );
+}
+
+function EarningsLoading() {
+  return (
+    <div className="animate-pulse space-y-7" aria-label="Loading earnings">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[...Array(4)].map((_, index) => (
+          <div
+            key={index}
+            className="h-32 rounded-2xl border border-border bg-muted"
+          />
+        ))}
+      </div>
+      <div className="h-80 rounded-2xl border border-border bg-muted" />
+    </div>
   );
 }
 

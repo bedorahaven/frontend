@@ -43,6 +43,7 @@ export function PropertyBookingWidget({ property }: PropertyBookingWidgetProps) 
 
   const [checkIn, setCheckIn] = useState<Date | undefined>(undefined);
   const [checkOut, setCheckOut] = useState<Date | undefined>(undefined);
+  const [today, setToday] = useState<Date | undefined>(undefined);
   const [guestsCount, setGuestsCount] = useState<string>('1');
   const [phoneNumber, setPhoneNumber] = useState<string>('');
   const [bookedRanges, setBookedRanges] = useState<{ check_in: string; check_out: string }[]>([]);
@@ -166,7 +167,13 @@ export function PropertyBookingWidget({ property }: PropertyBookingWidgetProps) 
         {/* Stay Dates Picker */}
         <div className="space-y-1.5">
           <label className="block text-[11px] font-bold tracking-wider uppercase text-muted-foreground">Stay Dates</label>
-          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+          <Popover
+            open={isCalendarOpen}
+            onOpenChange={(open) => {
+              if (open) setToday(new Date());
+              setIsCalendarOpen(open);
+            }}
+          >
             <PopoverTrigger
               className="w-full h-11 px-3.5 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 transition-colors flex items-center justify-between text-left font-normal"
             >
@@ -187,7 +194,7 @@ export function PropertyBookingWidget({ property }: PropertyBookingWidgetProps) 
                 mode="range"
                 selected={{ from: checkIn, to: checkOut }}
                 onSelect={handleDateSelect}
-                disabled={[{ before: new Date() }, ...disabledDays]}
+                disabled={[...(today ? [{ before: today }] : []), ...disabledDays]}
                 numberOfMonths={1}
                 className="text-xs font-sans"
               />

@@ -1,9 +1,21 @@
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Building2, CalendarDays, Wallet, BookmarkCheck } from "lucide-react";
 import { PropertiesTable } from "@/components/host/PropertiesTable";
 import { listProperties } from "@/lib/api/properties";
 
-export default async function HostDashboardPage() {
+export default function HostDashboardPage() {
+  return (
+    <Suspense fallback={<HostDashboardLoading />}>
+      <HostDashboardContent />
+    </Suspense>
+  );
+}
+
+async function HostDashboardContent() {
+  await connection();
+
   const supabase = await createClient();
 
   // 1. Get current user
@@ -136,6 +148,20 @@ export default async function HostDashboardPage() {
 
         <PropertiesTable properties={latestProperties} />
       </div>
+    </div>
+  );
+}
+
+function HostDashboardLoading() {
+  return (
+    <div className="animate-pulse space-y-8 p-4 md:p-8" aria-label="Loading dashboard">
+      <div className="h-12 w-64 rounded-xl bg-muted" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, index) => (
+          <div key={index} className="h-36 rounded-2xl bg-muted" />
+        ))}
+      </div>
+      <div className="h-64 rounded-2xl bg-muted" />
     </div>
   );
 }

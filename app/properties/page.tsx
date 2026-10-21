@@ -1,6 +1,7 @@
 import { listProperties } from '@/lib/api/properties';
 import { ExploreFeed } from '@/components/explore-feed';
 import { Suspense } from 'react';
+import { connection } from 'next/server';
 
 export default function PropertiesPage() {
   return (
@@ -15,6 +16,8 @@ export default function PropertiesPage() {
 }
 
 async function PropertiesContent() {
+  await connection();
+
   const properties = await listProperties();
   return <ExploreFeed initialProperties={properties} userCity="Nairobi" />;
 }
