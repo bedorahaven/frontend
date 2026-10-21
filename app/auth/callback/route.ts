@@ -23,10 +23,8 @@ export async function GET(request: Request) {
 
         const isHostIntent = next.includes('/host');
 
-        // Case 1: No profile exists yet
         if (!profile) {
           if (isHostIntent) {
-            // Auto-create profile as host or send directly to onboarding with host pre-selected
             await supabase.from('profiles').upsert({
               id: user.id,
               email: user.email!,
@@ -39,12 +37,10 @@ export async function GET(request: Request) {
           return NextResponse.redirect(`${origin}/onboarding`);
         }
 
-        // Case 2: Profile exists as guest, but user clicked "Become a Host"
         if (isHostIntent && profile.role !== 'host') {
           return NextResponse.redirect(`${origin}/onboarding?role=host`);
         }
 
-        // Case 3: Profile exists as host
         if (profile.role === 'host') {
           return NextResponse.redirect(`${origin}/host`);
         }
