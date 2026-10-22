@@ -84,6 +84,7 @@ export function PropertyBookingWidget({
   const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [bookingWarning, setBookingWarning] = useState<string | null>(null);
   const [successBooking, setSuccessBooking] = useState<BookingRecord | null>(
     null,
   );
@@ -103,7 +104,7 @@ export function PropertyBookingWidget({
   }));
 
   const nights =
-    checkIn && checkOut ? Math.max(1, differenceInDays(checkOut, checkIn)) : 1;
+    checkIn && checkOut ? differenceInDays(checkOut, checkIn) : 1;
   const guestCountNum = Number(guestsCount) || 1;
 
   const guestMultiplier =
@@ -115,7 +116,14 @@ export function PropertyBookingWidget({
   const handleDateSelect = (range: DateRange | undefined) => {
     if (range?.from) {
       setCheckIn(range.from);
+      if (range.to && differenceInDays(range.to, range.from) <= 0) {
+        setCheckOut(undefined);
+        setErrorMessage("Check-out must be at least one day after check-in.");
+        return;
+      }
+
       setCheckOut(range.to);
+      setErrorMessage(null);
       if (range.from && range.to) {
         setIsCalendarOpen(false);
       }
@@ -131,6 +139,11 @@ export function PropertyBookingWidget({
 
     if (!checkIn || !checkOut) {
       setErrorMessage("Please select both check-in and check-out dates.");
+      return;
+    }
+
+    if (differenceInDays(checkOut, checkIn) <= 0) {
+      setErrorMessage("Check-out must be at least one day after check-in.");
       return;
     }
 
@@ -171,6 +184,7 @@ export function PropertyBookingWidget({
 
       if (result.success && result.booking) {
         setSuccessBooking(result.booking as BookingRecord);
+        setBookingWarning(result.notificationWarning ?? null);
       } else {
         setErrorMessage(result.error || "Booking failed. Please try again.");
       }
@@ -191,17 +205,42 @@ export function PropertyBookingWidget({
           }),
         });
 
-        const data = await res.json();
+        const data: unknown = await res.json();
         setIsLoading(false);
 
-        if (data.authorization_url) {
-          window.location.href = data.authorization_url;
-        } else {
-          setErrorMessage(data.error || "Could not initialize card payment gateway.");
+        if (
+          typeof data === "object" &&
+          data !== null &&
+          "authorization_url" in data &&
+          typeof data.authorization_url === "string"
+        ) {
+          const authorizationUrl = new URL(data.authorization_url);
+          if (
+            authorizationUrl.protocol === "https:" &&
+            authorizationUrl.hostname === "checkout.paystack.com"
+          ) {
+            window.location.href = authorizationUrl.toString();
+            return;
+          }
         }
-      } catch (err) {
+
+        if (typeof data === "object" && data !== null && "error" in data) {
+          setErrorMessage(
+            typeof data.error === "string"
+              ? data.error
+              : "Could not initialize card payment gateway.",
+          );
+        } else {
+          setErrorMessage("Could not initialize card payment gateway.");
+        }
+      } catch (error) {
         setIsLoading(false);
-        setErrorMessage("Network error initializing card payment. Try again.");
+        console.error("Card payment initialization failed:", error);
+        setErrorMessage(
+          error instanceof Error && error.message === "Failed to fetch"
+            ? "Unable to reach the card payment service. Please check your connection and try again."
+            : "Card payment could not be initialized. Please try again.",
+        );
       }
     }
   };
@@ -212,7 +251,15 @@ export function PropertyBookingWidget({
         <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto text-emerald-500">
           <CheckCircle2 className="w-8 h-8" />
         </div>
-        <h3 className="text-xl font-bold">M-Pesa STK Push Sent!</h3>
+        <h3 className="text-xl font-bold">M-Pesa Push Sent!</h3>
+        {bookingWarning && (
+          <p
+            role="status"
+            className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-300"
+          >
+            {bookingWarning}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground leading-relaxed">
           Please check your phone (
           <span className="font-semibold text-foreground">{phoneNumber}</span>)

@@ -3,7 +3,7 @@ export type BookingStatus = 'pending' | 'confirmed' | 'cancelled'; // Add any ot
 export interface Booking {
   id: string; // uuid
   property_id: string; // uuid
-  guest_id: string; // uuid
+  guest_id: string | null; // uuid; null for unauthenticated guests
   check_in: string; // date (represented as string in JS, e.g. "YYYY-MM-DD")
   check_out: string; // date
   total_nights: number; // integer
