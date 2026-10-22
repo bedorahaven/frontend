@@ -585,7 +585,7 @@ export function ListingForm({
                 className="text-xs"
               />
             </div>
-            <div hidden>
+            <div>
               <label
                 htmlFor="property-country"
                 className="mb-1 block text-xs font-semibold"
@@ -599,6 +599,7 @@ export function ListingForm({
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
                 required
+                readOnly
                 className="text-xs"
               />
             </div>
