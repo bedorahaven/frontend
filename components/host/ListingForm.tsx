@@ -93,6 +93,10 @@ const VIDEO_EXTENSIONS = new Set([
   "webm",
 ]);
 const GENERIC_FILE_TYPES = new Set(["", "application/octet-stream"]);
+const MIN_IMAGES = 4;
+const MAX_IMAGES = 8;
+const MIN_VIDEOS = 1;
+const MAX_VIDEOS = 3;
 
 function isPropertyCategory(value: string | null): value is PropertyCategory {
   return CATEGORIES.some((category) => category.value === value);
@@ -115,6 +119,16 @@ function getMediaType(file: File): MediaType | null {
   }
 
   return null;
+}
+
+function getMediaCounts(items: Pick<UploadedMedia, "type">[]) {
+  return items.reduce(
+    (counts, item) => {
+      counts[item.type] += 1;
+      return counts;
+    },
+    { image: 0, video: 0 },
+  );
 }
 
 export function ListingForm({
@@ -170,11 +184,44 @@ export function ListingForm({
       type: item.media_type,
     })) ?? [],
   );
+  const mediaCounts = getMediaCounts(media);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
     if (files.length === 0) return;
+
+    const counts = getMediaCounts(media);
+    const filesToUpload: { file: File; type: MediaType }[] = [];
+    let skippedByLimit = 0;
+    let failedUploads = 0;
+
+    for (const file of files) {
+      const mediaType = getMediaType(file);
+      if (!mediaType) {
+        failedUploads += 1;
+        console.error(`Unsupported media type for ${file.name}: ${file.type}`);
+        continue;
+      }
+
+      const maximum = mediaType === "image" ? MAX_IMAGES : MAX_VIDEOS;
+      if (counts[mediaType] >= maximum) {
+        skippedByLimit += 1;
+        continue;
+      }
+
+      counts[mediaType] += 1;
+      filesToUpload.push({ file, type: mediaType });
+    }
+
+    if (filesToUpload.length === 0) {
+      if (skippedByLimit > 0) {
+        toast.error(`A listing can have up to ${MAX_IMAGES} photos and ${MAX_VIDEOS} videos.`);
+      } else {
+        toast.error("Choose supported photo or video files.");
+      }
+      return;
+    }
 
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
@@ -186,19 +233,9 @@ export function ListingForm({
 
     setUploadingMedia(true);
     const newMedia: UploadedMedia[] = [];
-    let failedUploads = 0;
 
     try {
-      for (const file of files) {
-        const mediaType = getMediaType(file);
-        if (!mediaType) {
-          failedUploads += 1;
-          console.error(
-            `Unsupported media type for ${file.name}: ${file.type}`,
-          );
-          continue;
-        }
-
+      for (const { file, type: mediaType } of filesToUpload) {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("upload_preset", uploadPreset);
@@ -242,9 +279,11 @@ export function ListingForm({
       if (failedUploads > 0) {
         toast.error(
           newMedia.length > 0
-            ? `${newMedia.length} file(s) uploaded; ${failedUploads} could not be uploaded.`
+            ? `${newMedia.length} file(s) uploaded; ${failedUploads} could not be uploaded.${skippedByLimit > 0 ? ` ${skippedByLimit} skipped due to media limits.` : ""}`
             : "No files could be uploaded. Check the supported formats and try again.",
         );
+      } else if (skippedByLimit > 0) {
+        toast.error(`${newMedia.length} file(s) uploaded; ${skippedByLimit} skipped. A listing can have up to ${MAX_IMAGES} photos and ${MAX_VIDEOS} videos.`);
       } else {
         toast.success("Photos and videos uploaded successfully!");
       }
@@ -281,11 +320,18 @@ export function ListingForm({
     const bathroomCount = Number(bathrooms);
     const parsedLatitude = latitude === "" ? undefined : Number(latitude);
     const parsedLongitude = longitude === "" ? undefined : Number(longitude);
+    const descriptionText = trimmedDescription
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;|&#160;|&#xA0;/gi, " ")
+      .replace(/\u00a0/g, " ")
+      .trim();
 
     if (
       !trimmedTitle ||
-      !trimmedDescription ||
+      !descriptionText ||
+      !isPropertyCategory(category) ||
       !trimmedCountry ||
+      !trimmedState ||
       !trimmedCity ||
       !trimmedAddress
     ) {
@@ -325,8 +371,20 @@ export function ListingForm({
       return;
     }
 
-    if (media.length === 0) {
-      toast.error("Please upload at least one property photo or video.");
+    if (selectedAmenities.length === 0) {
+      toast.error("Select at least one amenity.");
+      return;
+    }
+
+    if (
+      mediaCounts.image < MIN_IMAGES ||
+      mediaCounts.image > MAX_IMAGES ||
+      mediaCounts.video < MIN_VIDEOS ||
+      mediaCounts.video > MAX_VIDEOS
+    ) {
+      toast.error(
+        `Add ${MIN_IMAGES}-${MAX_IMAGES} photos and ${MIN_VIDEOS}-${MAX_VIDEOS} videos before saving.`,
+      );
       return;
     }
 
@@ -438,10 +496,15 @@ export function ListingForm({
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold">
+              <label
+                htmlFor="property-description"
+                className="mb-1 block text-xs font-semibold"
+              >
                 Description *
               </label>
               <RichTextEditor
+                id="property-description"
+                required
                 placeholder="Describe what makes your place special, neighborhood vibe..."
                 value={description}
                 onChange={setDescription}
@@ -497,10 +560,10 @@ export function ListingForm({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2">
               <label
-                htmlFor="property-address"
+                htmlFor="property-address-search"
                 className="mb-1 block text-xs font-semibold"
               >
-                Street Address / Building Name *
+                Search for an address (optional)
               </label>
               <AddressAutocomplete
                 value={address}
@@ -699,7 +762,7 @@ export function ListingForm({
                 htmlFor="max-guests"
                 className="mb-1 block text-xs font-semibold"
               >
-                Max Guests
+                Max Guests *
               </label>
               <Input
                 id="max-guests"
@@ -718,7 +781,7 @@ export function ListingForm({
                 htmlFor="bedrooms"
                 className="mb-1 block text-xs font-semibold"
               >
-                Bedrooms
+                Bedrooms *
               </label>
               <Input
                 id="bedrooms"
@@ -737,7 +800,7 @@ export function ListingForm({
                 htmlFor="beds"
                 className="mb-1 block text-xs font-semibold"
               >
-                Beds
+                Beds *
               </label>
               <Input
                 id="beds"
@@ -756,7 +819,7 @@ export function ListingForm({
                 htmlFor="bathrooms"
                 className="mb-1 block text-xs font-semibold"
               >
-                Bathrooms
+                Bathrooms *
               </label>
               <Input
                 id="bathrooms"
@@ -777,7 +840,7 @@ export function ListingForm({
         <div className="rounded-2xl border border-border bg-card p-6 space-y-4 shadow-sm">
           <div className="flex items-center gap-2 border-b border-border pb-3">
             <ListPlus className="h-5 w-5 text-accent" />
-            <h2 className="text-base font-bold">Amenities</h2>
+            <h2 className="text-base font-bold">Amenities *</h2>
             <span
               aria-live="polite"
               className="ml-auto rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground"
@@ -826,6 +889,10 @@ export function ListingForm({
               Property Photos and Videos *
             </h2>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Add {MIN_IMAGES}-{MAX_IMAGES} photos and {MIN_VIDEOS}-{MAX_VIDEOS} videos.{" "}
+            {mediaCounts.image} / {MAX_IMAGES} photos · {mediaCounts.video} / {MAX_VIDEOS} videos
+          </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {media.map((img) => (
@@ -866,7 +933,14 @@ export function ListingForm({
               </div>
             ))}
 
-            <label className="flex aspect-video cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 p-4 text-center transition-colors hover:bg-muted/50 focus-within:ring-2 focus-within:ring-ring">
+            <label
+              className={`flex aspect-video flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 p-4 text-center transition-colors focus-within:ring-2 focus-within:ring-ring ${
+                mediaCounts.image >= MAX_IMAGES &&
+                mediaCounts.video >= MAX_VIDEOS
+                  ? "cursor-not-allowed opacity-50"
+                  : "cursor-pointer hover:bg-muted/50"
+              }`}
+            >
               {uploadingMedia ? (
                 <span
                   role="status"
@@ -890,7 +964,12 @@ export function ListingForm({
                 accept=".jpg,.jpeg,.png,.webp,.avif,.heic,.heics,.heif,.heifs,.mp4,.mov,.m4v,.3gp,.3g2,.mkv,.webm,.avi,image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,video/mp4,video/quicktime,video/x-m4v,video/3gpp,video/3gpp2,video/x-matroska,video/webm,video/x-msvideo"
                 multiple
                 onChange={handleImageUpload}
-                disabled={uploadingMedia || loading}
+                disabled={
+                  uploadingMedia ||
+                  loading ||
+                  (mediaCounts.image >= MAX_IMAGES &&
+                    mediaCounts.video >= MAX_VIDEOS)
+                }
                 aria-label="Upload property photos and videos"
                 className="sr-only"
               />

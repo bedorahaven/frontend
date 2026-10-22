@@ -216,7 +216,7 @@ export function AddressAutocomplete({
   return (
     <div className="relative">
       <Input
-        id="property-address"
+        id="property-address-search"
         name="address"
         role="combobox"
         aria-autocomplete="list"
@@ -239,7 +239,6 @@ export function AddressAutocomplete({
           sessionTokenRef.current = null;
           setStatus("idle");
         }}
-        required
         className="text-xs"
       />
 

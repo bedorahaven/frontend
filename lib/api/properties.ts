@@ -1,7 +1,163 @@
 'use server';
 import { PropertyInsertInput, PropertyMediaInsertInput } from '@/types/properties';
+import type { MediaType } from '@/types/properties';
 import { createClient } from '@/utils/supabase/server';
   import { revalidatePath } from 'next/cache';
+
+const MIN_PROPERTY_IMAGES = 4;
+const MAX_PROPERTY_IMAGES = 8;
+const MIN_PROPERTY_VIDEOS = 1;
+const MAX_PROPERTY_VIDEOS = 3;
+const PROPERTY_CATEGORIES = new Set([
+  'trending',
+  'beachfront',
+  'cabins',
+  'luxury',
+  'countryside',
+  'amazing_views',
+]);
+
+type PropertyMediaInput = Omit<PropertyMediaInsertInput, 'property_id'> & {
+  id?: string;
+};
+
+function getPropertyValidationError(
+  propertyData: Omit<PropertyInsertInput, 'host_id'>,
+): string | null {
+  const requiredTextFields = [
+    propertyData.title,
+    propertyData.description,
+    propertyData.country,
+    propertyData.state,
+    propertyData.city,
+    propertyData.address,
+  ];
+
+  if (
+    requiredTextFields.some(
+      (value) => typeof value !== 'string' || !value.trim(),
+    ) ||
+    typeof propertyData.category !== 'string' ||
+    !PROPERTY_CATEGORIES.has(propertyData.category)
+  ) {
+    return 'Complete all required property details.';
+  }
+
+  const descriptionText = propertyData.description
+    ?.replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;|&#160;|&#xA0;/gi, ' ')
+    .replace(/\u00a0/g, ' ')
+    .trim();
+  const amenities = propertyData.amenities;
+
+  if (!descriptionText) {
+    return 'Complete all required property details.';
+  }
+
+  if (
+    !Number.isFinite(propertyData.price_per_night) ||
+    propertyData.price_per_night < 0 ||
+    !Number.isInteger(propertyData.max_guests) ||
+    (propertyData.max_guests ?? 0) < 1 ||
+    !Number.isInteger(propertyData.bedrooms) ||
+    (propertyData.bedrooms ?? -1) < 0 ||
+    !Number.isInteger(propertyData.beds) ||
+    (propertyData.beds ?? -1) < 0 ||
+    !Number.isFinite(propertyData.bathrooms) ||
+    (propertyData.bathrooms ?? 0) < 0.5 ||
+    (propertyData.bathrooms ?? 0) * 2 !==
+      Math.floor((propertyData.bathrooms ?? 0) * 2)
+  ) {
+    return 'Enter valid pricing and capacity values.';
+  }
+
+  if (
+    !Array.isArray(amenities) ||
+    amenities.length === 0 ||
+    amenities.some((amenity) => typeof amenity !== 'string' || !amenity.trim())
+  ) {
+    return 'Select at least one amenity.';
+  }
+
+  const { latitude, longitude, google_maps_url: googleMapsUrl } = propertyData;
+  if (
+    (latitude == null) !== (longitude == null) ||
+    (latitude != null &&
+      (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) ||
+    (longitude != null &&
+      (!Number.isFinite(longitude) || longitude < -180 || longitude > 180))
+  ) {
+    return 'Enter valid latitude and longitude coordinates together.';
+  }
+
+  if (googleMapsUrl != null && googleMapsUrl !== '') {
+    if (typeof googleMapsUrl !== 'string') {
+      return 'Enter a valid Google Maps link.';
+    }
+    try {
+      if (new URL(googleMapsUrl).protocol !== 'https:') {
+        return 'The Google Maps link must use HTTPS.';
+      }
+    } catch {
+      return 'Enter a valid Google Maps link.';
+    }
+  }
+
+  return null;
+}
+
+function isCloudinaryUrl(value: string, mediaType: MediaType): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'res.cloudinary.com' &&
+      url.pathname.includes(`/${mediaType}/upload/`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getMediaValidationError(
+  mediaData: readonly PropertyMediaInput[],
+  existingMediaTypes?: Map<string, MediaType>,
+): string | null {
+  let imageCount = 0;
+  let videoCount = 0;
+
+  for (const media of mediaData) {
+    const mediaType = media.id
+      ? existingMediaTypes?.get(media.id)
+      : media.media_type;
+
+    if (mediaType !== 'image' && mediaType !== 'video') {
+      return 'One or more media items have an invalid type.';
+    }
+
+    if (
+      !media.id &&
+      (typeof media.media_public_id !== 'string' ||
+        !media.media_public_id.trim() ||
+        typeof media.media_url !== 'string' ||
+        !isCloudinaryUrl(media.media_url, mediaType))
+    ) {
+      return 'Property media must have a valid Cloudinary URL and ID.';
+    }
+
+    if (mediaType === 'image') imageCount += 1;
+    else videoCount += 1;
+  }
+
+  if (imageCount < MIN_PROPERTY_IMAGES || imageCount > MAX_PROPERTY_IMAGES) {
+    return `A property must have ${MIN_PROPERTY_IMAGES}-${MAX_PROPERTY_IMAGES} photos.`;
+  }
+  if (videoCount < MIN_PROPERTY_VIDEOS || videoCount > MAX_PROPERTY_VIDEOS) {
+    return `A property must have ${MIN_PROPERTY_VIDEOS}-${MAX_PROPERTY_VIDEOS} videos.`;
+  }
+
+  return null;
+}
 
 export async function listProperties() {
   try {
@@ -131,6 +287,16 @@ export async function createProperty(
   mediaData: Omit<PropertyMediaInsertInput, 'property_id'>[]
 ) {
   try {
+    const propertyValidationError = getPropertyValidationError(propertyData);
+    if (propertyValidationError) {
+      return { success: false, error: propertyValidationError };
+    }
+
+    const mediaValidationError = getMediaValidationError(mediaData);
+    if (mediaValidationError) {
+      return { success: false, error: mediaValidationError };
+    }
+
     const supabase = await createClient();
 
     // 1. Get authenticated user securely on the server
@@ -158,17 +324,28 @@ export async function createProperty(
       return { success: false, error: propertyError?.message || 'Failed to create property.' };
     }
 
-    // 3. Insert media records...
-    if (mediaData && mediaData.length > 0) {
-      const mediaPayload = mediaData.map((media, index) => ({
-        property_id: newProperty.id,
-        media_url: media.media_url,
-        media_public_id: media.media_public_id,
-        media_type: media.media_type || 'image',
-        display_order: media.display_order ?? index,
-      }));
+    const mediaPayload = mediaData.map((media, index) => ({
+      property_id: newProperty.id,
+      media_url: media.media_url,
+      media_public_id: media.media_public_id,
+      media_type: media.media_type,
+      display_order: media.display_order ?? index,
+    }));
+    const { error: mediaError } = await supabase
+      .from('property_media')
+      .insert(mediaPayload);
 
-      await supabase.from('property_media').insert(mediaPayload);
+    if (mediaError) {
+      console.error('Property media insertion error:', mediaError.message);
+      const { error: cleanupError } = await supabase
+        .from('properties')
+        .delete()
+        .eq('id', newProperty.id)
+        .eq('host_id', user.id);
+      if (cleanupError) {
+        console.error('Unable to clean up property after media insertion failure:', cleanupError.message);
+      }
+      return { success: false, error: 'Property photos and videos could not be saved.' };
     }
 
     return { success: true, propertyId: newProperty.id };
@@ -210,9 +387,14 @@ export async function getHostPropertyForEdit(id: string) {
 export async function updateProperty(
   id: string,
   propertyData: Omit<PropertyInsertInput, 'host_id'>,
-  mediaData: (Omit<PropertyMediaInsertInput, 'property_id'> & { id?: string })[]
+  mediaData: PropertyMediaInput[]
 ) {
   try {
+    const propertyValidationError = getPropertyValidationError(propertyData);
+    if (propertyValidationError) {
+      return { success: false, error: propertyValidationError };
+    }
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -235,25 +417,9 @@ export async function updateProperty(
       return { success: false, error: 'Property not found or you do not have permission to edit it.' };
     }
 
-    if (mediaData.length === 0) {
-      return { success: false, error: 'Keep at least one property photo or video.' };
-    }
-
-    for (const media of mediaData.filter((item) => !item.id)) {
-      let mediaUrl: URL;
-      try {
-        mediaUrl = new URL(media.media_url);
-      } catch {
-        return { success: false, error: 'A media URL is invalid.' };
-      }
-      if (mediaUrl.protocol !== 'https:' || mediaUrl.hostname !== 'res.cloudinary.com') {
-        return { success: false, error: 'Property media must be hosted on Cloudinary.' };
-      }
-    }
-
     const { data: existingMedia, error: mediaFetchError } = await supabase
       .from('property_media')
-      .select('id')
+      .select('id, media_type')
       .eq('property_id', id);
 
     if (mediaFetchError || !existingMedia) {
@@ -261,6 +427,9 @@ export async function updateProperty(
       return { success: false, error: 'Unable to load existing property media.' };
     }
 
+    const existingMediaTypes = new Map(
+      existingMedia.map((media) => [media.id, media.media_type as MediaType]),
+    );
     const existingIds = new Set(existingMedia.map((media) => media.id));
     const submittedIds = mediaData.flatMap((media) => media.id ? [media.id] : []);
     if (
@@ -268,6 +437,11 @@ export async function updateProperty(
       submittedIds.some((mediaId) => !existingIds.has(mediaId))
     ) {
       return { success: false, error: 'One or more media items do not belong to this property.' };
+    }
+
+    const mediaValidationError = getMediaValidationError(mediaData, existingMediaTypes);
+    if (mediaValidationError) {
+      return { success: false, error: mediaValidationError };
     }
 
     const updateData: Omit<PropertyInsertInput, 'host_id'> = {
@@ -295,7 +469,7 @@ export async function updateProperty(
         property_id: id,
         media_url: media.media_url,
         media_public_id: media.media_public_id,
-        media_type: media.media_type || 'image',
+        media_type: media.media_type,
         display_order: media.display_order ?? index,
       }));
 

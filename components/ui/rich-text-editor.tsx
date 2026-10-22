@@ -15,17 +15,21 @@ import {
 } from "@/components/ui/popover";
 
 interface RichTextEditorProps {
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  required?: boolean;
 }
 
 export function RichTextEditor({
+  id,
   value,
   onChange,
   placeholder,
   className,
+  required = false,
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const savedRangeRef = useRef<Range | null>(null);
@@ -199,8 +203,12 @@ export function RichTextEditor({
 
       {/* Editable Area with locked LTR styles */}
       <div
+        id={id}
         ref={editorRef}
         contentEditable
+        role="textbox"
+        aria-multiline="true"
+        aria-required={required}
         dir="ltr"
         onInput={(e) => {
           onChange(e.currentTarget.innerHTML);

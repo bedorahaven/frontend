@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
-import { Star, MapPin, Wifi, Car, Tv, Coffee, ShieldCheck, CheckCircle2, Smartphone, Award } from 'lucide-react';
+import { MapPin, Wifi, Car, Tv, Coffee, ShieldCheck, CheckCircle2, Award } from 'lucide-react';
 import { PropertyActions } from '@/components/property-actions';
 import { PropertyReviewsSummary } from '@/components/property-reviews-summary';
 import { PropertyMap } from '@/components/property-map';
@@ -29,7 +29,7 @@ async function PropertyDetailContent({ params }: { params: Promise<{ id: string 
   if (!property) {
     notFound();
   }
-  
+
   const gallery = property.media_gallery || [property.media_url];
   const host = property.host || {};
 
