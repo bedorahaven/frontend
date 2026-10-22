@@ -19,24 +19,28 @@ export interface Booking {
 }
 
 export async function getPropertyBookedDates(propertyId: string) {
-  try {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from('bookings')
-      .select('check_in, check_out')
-      .eq('property_id', propertyId)
-      .eq('status', 'confirmed');
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('get_property_booked_dates', {
+    p_property_id: propertyId,
+  });
 
-    if (error) {
-      console.warn('Error fetching booked dates:', error.message);
-      return [];
-    }
-
-    return data || [];
-  } catch (err) {
-    console.warn('Exception fetching booked dates:', err);
-    return [];
+  if (error) {
+    console.error('Booked date lookup failed:', error.message);
+    throw new Error('Unable to load this property’s availability.');
   }
+
+  if (
+    !Array.isArray(data) ||
+    data.some(
+      (range) =>
+        typeof range.check_in !== 'string' ||
+        typeof range.check_out !== 'string',
+    )
+  ) {
+    throw new Error('Availability response was invalid.');
+  }
+
+  return data;
 }
 
 export async function createBooking(payload: {
@@ -85,8 +89,11 @@ export async function createBooking(payload: {
     );
 
     if (bookingError) {
-      if (bookingError.code === '23P01') {
-        throw new Error('Selected dates are already booked. Please choose different dates.');
+      if (
+        bookingError.code === '23P01' ||
+        bookingError.message.toLowerCase().includes('already booked')
+      ) {
+         throw new Error('Selected dates are already booked. Please choose different dates.');
       }
       throw new Error(bookingError.message);
     }

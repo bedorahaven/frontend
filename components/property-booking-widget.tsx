@@ -12,7 +12,7 @@ import {
   Mail
 } from "lucide-react";
 import { DateRange } from "react-day-picker";
-import { format, differenceInDays, parseISO } from "date-fns";
+import { format, differenceInDays, parseISO, subDays } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 
@@ -81,6 +81,10 @@ export function PropertyBookingWidget({
   const [bookedRanges, setBookedRanges] = useState<
     { check_in: string; check_out: string }[]
   >([]);
+  const [availabilityStatus, setAvailabilityStatus] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
 
   const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -90,19 +94,48 @@ export function PropertyBookingWidget({
     null,
   );
 
-  // Fetch confirmed booked dates on mount
+  // Resolve availability before allowing date selection or checkout.
   useEffect(() => {
+    let isActive = true;
+
     async function loadAvailability() {
-      const ranges = await getPropertyBookedDates(property.id);
-      setBookedRanges(ranges);
+      setAvailabilityStatus("loading");
+      setAvailabilityError(null);
+
+      try {
+        const ranges = await getPropertyBookedDates(property.id);
+        if (!isActive) return;
+        setBookedRanges(ranges);
+        setAvailabilityStatus("ready");
+      } catch (error) {
+        if (!isActive) return;
+        console.error("Property availability could not be loaded:", error);
+        setAvailabilityError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load this property’s availability.",
+        );
+        setAvailabilityStatus("error");
+      }
     }
-    loadAvailability();
+
+    void loadAvailability();
+    return () => {
+      isActive = false;
+    };
   }, [property.id]);
 
   const disabledDays = bookedRanges.map((range) => ({
     from: parseISO(range.check_in),
-    to: parseISO(range.check_out),
+    to: subDays(parseISO(range.check_out), 1),
   }));
+
+  const hasDateConflict = (start: Date, end: Date) =>
+    bookedRanges.some((range) => {
+      const bookedStart = parseISO(range.check_in);
+      const bookedEnd = parseISO(range.check_out);
+      return start < bookedEnd && end > bookedStart;
+    });
 
   const nights =
     checkIn && checkOut ? differenceInDays(checkOut, checkIn) : 1;
@@ -120,6 +153,14 @@ export function PropertyBookingWidget({
       if (range.to && differenceInDays(range.to, range.from) <= 0) {
         setCheckOut(undefined);
         setErrorMessage("Check-out must be at least one day after check-in.");
+        return;
+      }
+
+      if (range.to && hasDateConflict(range.from, range.to)) {
+        setCheckOut(undefined);
+        setErrorMessage(
+          "Those dates include a night that is already reserved. Please choose different dates.",
+        );
         return;
       }
 
@@ -145,6 +186,22 @@ export function PropertyBookingWidget({
 
     if (differenceInDays(checkOut, checkIn) <= 0) {
       setErrorMessage("Check-out must be at least one day after check-in.");
+      return;
+    }
+
+    if (availabilityStatus !== "ready") {
+      setErrorMessage(
+        availabilityError ??
+          "Availability is still loading. Please wait and try again.",
+      );
+      return;
+    }
+
+    if (hasDateConflict(checkIn, checkOut)) {
+      setCheckOut(undefined);
+      setErrorMessage(
+        "Those dates are no longer available. Please select another stay.",
+      );
       return;
     }
 
@@ -325,7 +382,10 @@ export function PropertyBookingWidget({
           <Popover
             open={isCalendarOpen}
             onOpenChange={(open) => {
-              if (open) setToday(new Date());
+              if (open) {
+                setToday(new Date());
+                setErrorMessage(null);
+              }
               setIsCalendarOpen(open);
             }}
           >
@@ -351,6 +411,7 @@ export function PropertyBookingWidget({
                 selected={{ from: checkIn, to: checkOut }}
                 onSelect={handleDateSelect}
                 disabled={[
+                  ...(availabilityStatus !== "ready" ? [true] : []),
                   ...(today ? [{ before: today }] : []),
                   ...disabledDays,
                 ]}
@@ -359,6 +420,16 @@ export function PropertyBookingWidget({
               />
             </PopoverContent>
           </Popover>
+          {availabilityStatus === "loading" && (
+            <p className="text-xs text-muted-foreground">
+              Checking availability…
+            </p>
+          )}
+          {availabilityError && (
+            <p role="alert" className="text-xs text-destructive">
+              {availabilityError} Booking is disabled until availability can be checked.
+            </p>
+          )}
         </div>
 
         {/* Guests Select */}
@@ -485,7 +556,7 @@ export function PropertyBookingWidget({
 
         <Button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || availabilityStatus !== "ready"}
           className="w-full h-11 rounded-xl bg-accent text-accent-foreground font-bold text-sm shadow-lg hover:opacity-95 transition-opacity flex items-center justify-center gap-2 mt-2"
         >
           {isLoading ? (

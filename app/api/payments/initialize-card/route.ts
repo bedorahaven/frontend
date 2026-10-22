@@ -66,6 +66,33 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
+  const { data: isAvailable, error: availabilityError } = await supabase.rpc(
+    "is_property_available",
+    {
+      p_property_id: propertyId,
+      p_check_in: checkInDate,
+      p_check_out: checkOutDate,
+    },
+  );
+
+  if (availabilityError) {
+    console.error(
+      "Paystack availability check failed:",
+      availabilityError.message,
+    );
+    return NextResponse.json(
+      { error: "Unable to verify availability. Please try again." },
+      { status: 503 },
+    );
+  }
+
+  if (isAvailable !== true) {
+    return NextResponse.json(
+      { error: "Those dates are no longer available. Please choose another stay." },
+      { status: 409 },
+    );
+  }
+
   const { data: property, error: propertyError } = await supabase
     .from("properties")
     .select("id, price_per_night, max_guests, is_active")
