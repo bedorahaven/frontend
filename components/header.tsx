@@ -51,18 +51,19 @@ function HeaderContent() {
   const supabase = createClient();
 
   // Fetch logged-in user and profile on mount
+// Fetch logged-in user and profile on mount
   useEffect(() => {
     async function getUserData() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
+      // 1. Instantly read local session from cookies/storage
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
 
-      if (user) {
+      if (currentUser) {
         const { data: profileData } = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", user.id)
+          .eq("id", currentUser.id)
           .single();
         setProfile(profileData);
       }
@@ -70,18 +71,19 @@ function HeaderContent() {
 
     getUserData();
 
-    // Listen for auth changes
+    // 2. Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        supabase
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        const { data: profileData } = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", session.user.id)
-          .single()
-          .then(({ data }) => setProfile(data));
+          .eq("id", currentUser.id)
+          .single();
+        setProfile(profileData);
       } else {
         setProfile(null);
       }
@@ -90,7 +92,7 @@ function HeaderContent() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [pathname, supabase]);
+  }, [supabase]);
 
   // Track window scroll
   useEffect(() => {
