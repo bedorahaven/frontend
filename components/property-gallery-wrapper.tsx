@@ -211,15 +211,6 @@ export function PropertyGalleryWrapper({ gallery, title }: PropertyGalleryWrappe
               </div>
             );
           })}
-
-          {/* Desktop "Show all photos" Floating Button */}
-          <button
-            onClick={() => openGalleryAt(0)}
-            className="absolute bottom-5 right-5 z-10 bg-background/90 hover:bg-background text-foreground text-xs font-bold py-2.5 px-4 rounded-xl border border-border shadow-lg backdrop-blur-md flex items-center gap-2 transition-all hover:scale-102 active:scale-98"
-          >
-            <Grid className="w-4 h-4 text-accent" />
-            <span>Show all {totalCount} photos & videos</span>
-          </button>
         </div>
       </section>
 
