@@ -494,7 +494,7 @@ export function ListingForm({
             <h2 className="text-base font-bold">Location & Coordinates</h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2">
               <label
                 htmlFor="property-address"
@@ -585,7 +585,7 @@ export function ListingForm({
                 className="text-xs"
               />
             </div>
-            <div>
+            <div hidden>
               <label
                 htmlFor="property-country"
                 className="mb-1 block text-xs font-semibold"
@@ -604,7 +604,7 @@ export function ListingForm({
             </div>
 
             {/* Latitude & Longitude inputs for precise Google Maps placement */}
-            <div>
+            <div hidden>
               <label
                 htmlFor="property-latitude"
                 className="mb-1 block text-xs font-semibold"
@@ -622,7 +622,7 @@ export function ListingForm({
                 className="text-xs"
               />
             </div>
-            <div>
+            <div hidden>
               <label
                 htmlFor="property-longitude"
                 className="mb-1 block text-xs font-semibold"
@@ -641,7 +641,7 @@ export function ListingForm({
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div hidden className="sm:col-span-2">
               <label
                 htmlFor="property-maps-url"
                 className="mb-1 block text-xs font-semibold"
