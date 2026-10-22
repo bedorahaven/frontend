@@ -1,13 +1,25 @@
 import { NextResponse } from "next/server";
+import { sendHostBookingNotification } from "@/lib/email";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const reference = searchParams.get("reference") ?? "";
-  const propertyId = searchParams.get("property_id") ?? "";
+export async function POST(request: Request) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  if (!isRecord(body)) {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const reference = typeof body.reference === "string" ? body.reference : "";
+  const propertyId = typeof body.property_id === "string" ? body.property_id : "";
 
   if (
     !/^[A-Za-z0-9_-]{1,100}$/.test(reference) ||
@@ -71,6 +83,7 @@ export async function GET(request: Request) {
 
   const transaction = responseBody.data;
   const metadata = transaction.metadata;
+  const customer = transaction.customer;
   const isSuccessful =
     transaction.status === "success" &&
     transaction.reference === reference &&
@@ -79,7 +92,13 @@ export async function GET(request: Request) {
     Number.isSafeInteger(transaction.amount) &&
     transaction.amount > 0 &&
     isRecord(metadata) &&
-    metadata.property_id === propertyId;
+    metadata.property_id === propertyId &&
+    typeof metadata.check_in === "string" &&
+    typeof metadata.check_out === "string" &&
+    typeof metadata.total_nights === "number" &&
+    typeof metadata.guests_count === "number" &&
+    isRecord(customer) &&
+    typeof customer.email === "string";
 
   if (!isSuccessful) {
     return NextResponse.json(
@@ -88,9 +107,148 @@ export async function GET(request: Request) {
     );
   }
 
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (error) {
+    console.error("Card payment finalization is not configured:", error);
+    return NextResponse.json(
+      {
+        verified: true,
+        booking_confirmed: false,
+        error:
+          "Paystack received your payment, but booking confirmation is temporarily unavailable. Please contact support with your payment reference.",
+      },
+      { status: 503 },
+    );
+  }
+
+  const { data: finalizedData, error: finalizeError } = await admin.rpc(
+    "finalize_paystack_booking",
+    {
+      p_reference: reference,
+      p_property_id: propertyId,
+      p_check_in: metadata.check_in,
+      p_check_out: metadata.check_out,
+      p_total_nights: metadata.total_nights,
+      p_guests_count: metadata.guests_count,
+      p_amount_minor: transaction.amount,
+      p_guest_email: customer.email,
+      p_callback_metadata: {
+        provider: "paystack",
+        reference,
+        status: transaction.status,
+        amount: transaction.amount,
+        currency: transaction.currency,
+        paid_at: transaction.paid_at ?? null,
+        channel: transaction.channel ?? null,
+      },
+    },
+  );
+
+  if (
+    finalizeError ||
+    !isRecord(finalizedData) ||
+    typeof finalizedData.booking_id !== "string"
+  ) {
+    console.error(
+      "Paystack payment was verified but booking finalization failed:",
+      finalizeError?.message ?? "The database returned an invalid finalization result.",
+    );
+    return NextResponse.json(
+      {
+        verified: true,
+        booking_confirmed: false,
+        error:
+          "Paystack received your payment, but we could not confirm the booking yet. Please contact support with your payment reference.",
+      },
+      { status: 503 },
+    );
+  }
+
+  let notificationStatus: "sent" | "pending" = "pending";
+  const { data: notification, error: claimError } = await admin.rpc(
+    "claim_paystack_booking_notification",
+    { p_reference: reference },
+  );
+
+  if (claimError) {
+    console.error(
+      "Could not claim host booking notification:",
+      claimError.message,
+    );
+  } else if (isRecord(notification) && notification.claimed === true) {
+    try {
+      if (
+        typeof notification.host_email !== "string" ||
+        typeof notification.property_name !== "string" ||
+        typeof notification.guest_email !== "string" ||
+        typeof notification.check_in !== "string" ||
+        typeof notification.check_out !== "string" ||
+        typeof notification.total_nights !== "number" ||
+        typeof notification.total_price !== "number"
+      ) {
+        throw new Error("Host notification details are incomplete.");
+      }
+
+      const emailId = await sendHostBookingNotification({
+        hostEmail: notification.host_email,
+        propertyName: notification.property_name,
+        guestContact: notification.guest_email,
+        checkIn: notification.check_in,
+        checkOut: notification.check_out,
+        totalNights: notification.total_nights,
+        totalPrice: notification.total_price,
+        paymentMethod: "paystack",
+      });
+
+      const { error: sentError } = await admin.rpc(
+        "complete_paystack_booking_notification",
+        { p_reference: reference, p_resend_email_id: emailId },
+      );
+
+      if (sentError) {
+        console.error(
+          "Host email was accepted by Resend but notification state update failed:",
+          sentError.message,
+        );
+      } else {
+        notificationStatus = "sent";
+      }
+    } catch (error) {
+      console.error("Host booking notification delivery failed:", error);
+      const { error: failureUpdateError } = await admin.rpc(
+        "fail_paystack_booking_notification",
+        {
+          p_reference: reference,
+          p_error:
+            error instanceof Error ? error.message.slice(0, 500) : "Email delivery failed.",
+        },
+      );
+      if (failureUpdateError) {
+        console.error(
+          "Could not record host notification failure:",
+          failureUpdateError.message,
+        );
+      }
+    }
+  } else if (
+    isRecord(notification) &&
+    notification.status === "sent"
+  ) {
+    notificationStatus = "sent";
+  }
+
   return NextResponse.json({
     verified: true,
     amount: transaction.amount,
     currency: transaction.currency,
+    booking_confirmed: true,
+    host_notification: notificationStatus,
+    account_contact: customer.email,
+    notification_warning:
+      notificationStatus === "pending"
+        ? "Your payment and booking are confirmed. We could not send the host notification email yet."
+        : null,
   });
 }

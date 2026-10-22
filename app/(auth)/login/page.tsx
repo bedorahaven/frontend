@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -81,6 +82,12 @@ function LoginForm() {
         )}
         Continue with Google
       </Button>
+      <p className="text-xs text-muted-foreground">
+        Already booked as a guest?{" "}
+        <Link href="/login/guest" className="font-semibold text-accent underline">
+          Sign in with email or phone
+        </Link>
+      </p>
     </div>
   );
 }

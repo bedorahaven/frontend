@@ -23,16 +23,24 @@ export async function sendHostBookingNotification(params: {
   totalPrice: number;
   paymentMethod: string;
 }) {
-  if (!process.env.RESEND_API_KEY) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
     throw new Error('RESEND_API_KEY is not configured.');
   }
 
-  const resend = new Resend(process.env.RESEND_API_KEY);
+  const from = process.env.RESEND_FROM_EMAIL;
+  if (!from) {
+    throw new Error(
+      'RESEND_FROM_EMAIL is not configured. Set it to a sender address verified in Resend.',
+    );
+  }
+
+  const resend = new Resend(apiKey);
   const propertyName = escapeHtml(params.propertyName);
   const guestContact = escapeHtml(params.guestContact);
   const paymentMethod = escapeHtml(params.paymentMethod);
   const { data, error } = await resend.emails.send({
-    from: 'Bedorahaven <onboarding@resend.dev>',
+    from,
     to: [params.hostEmail],
     subject: `New Booking Confirmed for ${params.propertyName}`,
     html: `
@@ -73,4 +81,6 @@ export async function sendHostBookingNotification(params: {
   if (!data?.id) {
     throw new Error('Resend did not return an email delivery ID.');
   }
+
+  return data.id;
 }

@@ -2,7 +2,7 @@ export type UserRole = "guest" | "host" | "admin"; // Adjust based on your publi
 
 export interface Profile {
   id: string; // uuid (references auth.users)
-  email: string; // text
+  email: string | null; // text; phone-only guest accounts do not have an email
   full_name: string; // text
   phone_number: string | null; // text
   business_name: string | null;

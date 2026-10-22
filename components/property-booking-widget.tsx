@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/input-group";
 import { getPropertyBookedDates, createBooking } from "@/lib/api/bookings";
 import { PropertyReviewsSummary } from "./property-reviews-summary";
+import { GuestAccountAccess } from "@/components/guest-account-access";
 
 interface BookingRecord {
   id: string;
@@ -285,6 +286,10 @@ export function PropertyBookingWidget({
             <span className="font-semibold">{successBooking.check_out}</span>
           </div>
         </div>
+        <GuestAccountAccess
+          initialMethod="phone"
+          initialContact={phoneNumber}
+        />
         <Button
           onClick={() => {
             setSuccessBooking(null);

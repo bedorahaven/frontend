@@ -8,10 +8,18 @@ import {
   CircleAlert,
   LoaderCircle,
 } from "lucide-react";
+import { GuestAccountAccess } from "@/components/guest-account-access";
 
 type PaymentState =
   | { status: "verifying" }
-  | { status: "success"; amount: number; currency: string }
+  | { status: "pending-confirmation"; message: string }
+  | {
+      status: "success";
+      amount: number;
+      currency: string;
+      accountContact: string;
+      notificationWarning: string | null;
+    }
   | { status: "error"; message: string };
 
 interface CardPaymentReturnProps {
@@ -22,16 +30,27 @@ interface CardPaymentReturnProps {
 
 function isVerificationResult(
   value: unknown,
-): value is { verified: true; amount: number; currency: string } {
+): value is {
+  verified: true;
+  booking_confirmed: true;
+  amount: number;
+  currency: string;
+  account_contact: string;
+  notification_warning?: string | null;
+} {
   return (
     typeof value === "object" &&
     value !== null &&
     "verified" in value &&
     value.verified === true &&
+    "booking_confirmed" in value &&
+    value.booking_confirmed === true &&
     "amount" in value &&
     typeof value.amount === "number" &&
     "currency" in value &&
-    typeof value.currency === "string"
+    typeof value.currency === "string" &&
+    "account_contact" in value &&
+    typeof value.account_contact === "string"
   );
 }
 
@@ -43,6 +62,22 @@ function getErrorMessage(value: unknown): string | null {
     typeof value.error === "string"
   ) {
     return value.error;
+  }
+
+  return null;
+}
+
+function getConfirmationPendingMessage(value: unknown): string | null {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "verified" in value &&
+    value.verified === true &&
+    "booking_confirmed" in value &&
+    value.booking_confirmed === false
+  ) {
+    return getErrorMessage(value) ??
+      "Your payment was received, but your booking still needs confirmation.";
   }
 
   return null;
@@ -72,15 +107,25 @@ export function CardPaymentReturn({
 
     async function verifyPayment() {
       try {
-        const params = new URLSearchParams({
+        const response = await fetch("/api/payments/verify-card", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
           reference: paymentReference,
           property_id: propertyId,
-        });
-        const response = await fetch(`/api/payments/verify-card?${params}`, {
-          cache: "no-store",
+          }),
           signal: controller.signal,
         });
         const result: unknown = await response.json();
+
+        const pendingMessage = getConfirmationPendingMessage(result);
+        if (pendingMessage) {
+          setPayment({
+            status: "pending-confirmation",
+            message: pendingMessage,
+          });
+          return;
+        }
 
         if (!response.ok || !isVerificationResult(result)) {
           setPayment({
@@ -96,6 +141,11 @@ export function CardPaymentReturn({
           status: "success",
           amount: result.amount,
           currency: result.currency,
+          accountContact: result.account_contact,
+          notificationWarning:
+            typeof result.notification_warning === "string"
+              ? result.notification_warning
+              : null,
         });
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -157,6 +207,20 @@ export function CardPaymentReturn({
           </>
         )}
 
+        {displayedPayment.status === "pending-confirmation" && (
+          <>
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+              <CircleAlert className="h-9 w-9" />
+            </div>
+            <h1 className="mt-6 text-2xl font-bold">
+              Payment received, confirmation pending
+            </h1>
+            <p className="mt-3 text-sm text-muted-foreground">
+              {displayedPayment.message}
+            </p>
+          </>
+        )}
+
         {displayedPayment.status === "success" && (
           <>
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
@@ -177,6 +241,20 @@ export function CardPaymentReturn({
             <p className="mt-2 text-sm text-muted-foreground">
               Thank you for booking with Bedora Haven.
             </p>
+            {displayedPayment.notificationWarning && (
+              <p
+                role="status"
+                className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-800 dark:text-amber-300"
+              >
+                {displayedPayment.notificationWarning}
+              </p>
+            )}
+            <div className="mt-6 text-left">
+              <GuestAccountAccess
+                initialMethod="email"
+                initialContact={displayedPayment.accountContact}
+              />
+            </div>
           </>
         )}
 
