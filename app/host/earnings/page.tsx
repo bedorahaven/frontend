@@ -116,20 +116,13 @@ function PageHeading() {
   return (
     <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-          Host workspace
-        </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
           Earnings
         </h1>
         <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-          Follow payment activity and completed earnings from bookings at your
-          properties.
+          Earnings are calculated from completed transactions
         </p>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Earnings are calculated from completed transactions
-      </p>
     </header>
   );
 }
