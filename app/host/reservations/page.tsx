@@ -47,9 +47,6 @@ async function HostReservationsContent() {
     return (
       <main className="space-y-6 p-4 md:p-8">
         <header>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-            Host workspace
-          </p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight">Reservations</h1>
         </header>
         <div
@@ -75,9 +72,6 @@ async function HostReservationsContent() {
     return (
       <main className="space-y-6 p-4 md:p-8">
         <header>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-            Host workspace
-          </p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight">Reservations</h1>
         </header>
         <div
@@ -152,9 +146,6 @@ async function HostReservationsContent() {
     <main className="space-y-7 p-4 md:p-8">
       <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-            Host workspace
-          </p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             Reservations
           </h1>
@@ -170,22 +161,26 @@ async function HostReservationsContent() {
 
       <section
         aria-label="Reservation overview"
-        className="grid gap-4 sm:grid-cols-2"
+        className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 pt-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0"
       >
-        <SummaryCard
-          label="Total reservations"
-          value={reservations.length}
-          detail="All reservations across your listings"
-          icon={CalendarDays}
-          accent="blue"
-        />
-        <SummaryCard
-          label="Ongoing reservations"
-          value={ongoingReservations}
-          detail="Confirmed stays happening today"
-          icon={Clock3}
-          accent="green"
-        />
+        <div className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none">
+          <SummaryCard
+            label="Total reservations"
+            value={reservations.length}
+            detail="All reservations across your listings"
+            icon={CalendarDays}
+            accent="blue"
+          />
+        </div>
+        <div className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none">
+          <SummaryCard
+            label="Ongoing reservations"
+            value={ongoingReservations}
+            detail="Confirmed stays happening today"
+            icon={Clock3}
+            accent="green"
+          />
+        </div>
       </section>
 
       {guestsResult.error && (
@@ -207,9 +202,12 @@ function ReservationsLoading() {
   return (
     <div className="animate-pulse space-y-7 p-4 md:p-8" aria-label="Loading reservations">
       <div className="h-12 w-64 rounded-xl bg-muted" />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 pt-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0">
         {[...Array(2)].map((_, index) => (
-          <div key={index} className="h-32 rounded-2xl bg-muted" />
+          <div
+            key={index}
+            className="h-32 w-[85vw] max-w-[320px] shrink-0 snap-center rounded-2xl bg-muted sm:w-auto sm:max-w-none"
+          />
         ))}
       </div>
       <div className="h-80 rounded-2xl bg-muted" />
