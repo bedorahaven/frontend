@@ -8,6 +8,27 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+function LoginFormSkeleton() {
+  return (
+    <div className="max-w-md w-full p-8 bg-card border border-border rounded-3xl shadow-sm space-y-6 text-center animate-pulse">
+      {/* Title & Subtitle Skeleton */}
+      <div className="space-y-2 flex flex-col items-center">
+        <div className="h-6 w-3/4 bg-muted rounded-md" />
+        <div className="h-3 w-5/6 bg-muted rounded-md" />
+        <div className="h-3 w-2/3 bg-muted rounded-md" />
+      </div>
+
+      {/* Button Skeleton */}
+      <div className="w-full h-11 bg-muted rounded-xl" />
+
+      {/* Footer Text Skeleton */}
+      <div className="flex justify-center items-center">
+        <div className="h-3 w-4/5 bg-muted rounded-md" />
+      </div>
+    </div>
+  );
+}
+
 function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
@@ -83,7 +104,7 @@ function LoginForm() {
         Continue with Google
       </Button>
       <p className="text-xs text-muted-foreground">
-        Already booked as a guest?{" "}
+        Already booked as a guest?{' '}
         <Link href="/guest" className="font-semibold text-accent underline">
           Sign in with email or phone
         </Link>
@@ -95,7 +116,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Suspense fallback={<div className="text-xs text-muted-foreground">Loading authentication...</div>}>
+      <Suspense fallback={<LoginFormSkeleton />}>
         <LoginForm />
       </Suspense>
     </div>
