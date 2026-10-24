@@ -1,4 +1,3 @@
-import { GuestAccountAccess } from "@/components/guest-account-access";
 import { GuestLogin } from "@/components/guest-login";
 
 export default function GuestLoginPage() {

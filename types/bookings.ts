@@ -36,4 +36,5 @@ export interface GuestLookupResult {
   total_price: number;
   status: BookingStatus;
   mpesa_receipt_number: string | null;
+  created_at?: string;
 }

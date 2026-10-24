@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Phone, Mail, Search, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Phone, Mail, Search, Loader2, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // Convert 2-letter ISO country code to Emoji Flag
@@ -102,7 +102,7 @@ export function GuestLogin() {
       });
 
       // Redirect to the reservation lookup result page
-      router.push(`/lookup/reservation?${queryParams.toString()}`);
+      router.push(`/lookup?${queryParams.toString()}`);
       toast.success('Searching for your stay details...');
     } catch (error) {
       console.error('Lookup failed:', error);
@@ -115,17 +115,6 @@ export function GuestLogin() {
   return (
     <div className="max-w-md w-full mx-auto bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
 
-      {/* Header */}
-      <div className="text-center space-y-2">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-bold border border-accent/20">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Instant Booking Lookup</span>
-        </div>
-        <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Access Your Stay</h2>
-        <p className="text-xs text-muted-foreground">
-          Enter the phone number or email address you used during Paystack checkout.
-        </p>
-      </div>
 
       {/* Auth Method Switcher Tabs */}
       <div className="grid grid-cols-2 p-1 bg-muted rounded-2xl text-xs font-semibold">
@@ -192,9 +181,6 @@ export function GuestLogin() {
                 <Phone className="w-4 h-4 opacity-50" />
               </div>
             </div>
-            <p className="text-[10px] text-muted-foreground pl-1">
-              Auto-detected country: <strong className="text-foreground">{geo.countryName}</strong>
-            </p>
           </div>
         ) : (
           /* EMAIL INPUT GROUP */

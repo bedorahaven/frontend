@@ -84,7 +84,7 @@ function LoginForm() {
       </Button>
       <p className="text-xs text-muted-foreground">
         Already booked as a guest?{" "}
-        <Link href="/login/guest" className="font-semibold text-accent underline">
+        <Link href="/guest" className="font-semibold text-accent underline">
           Sign in with email or phone
         </Link>
       </p>
