@@ -55,13 +55,11 @@ async function EarningsContent() {
 
   return (
     <>
-      {/* <section aria-label="Earnings overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"> */}
-      <div
+      <section
         aria-label="Earnings overview"
         className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 pt-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0"
       >
         <div
-          key={"completedEarnings"}
           className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
         >
           <SummaryCard
@@ -71,6 +69,8 @@ async function EarningsContent() {
             icon={Banknote}
             accent="green"
           />
+        </div>
+        <div className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink">
           <SummaryCard
             label="Transactions"
             value={earnings.transactions.length.toLocaleString()}
@@ -78,6 +78,8 @@ async function EarningsContent() {
             icon={ReceiptText}
             accent="blue"
           />
+        </div>
+        <div className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink">
           <SummaryCard
             label="Total bookings"
             value={earnings.bookingsCount.toLocaleString()}
@@ -85,6 +87,8 @@ async function EarningsContent() {
             icon={CalendarCheck2}
             accent="violet"
           />
+        </div>
+        <div className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink">
           <SummaryCard
             label="Your properties"
             value={earnings.propertiesCount.toLocaleString()}
@@ -97,7 +101,7 @@ async function EarningsContent() {
             accent="amber"
           />
         </div>
-      </div>
+      </section>
 
       <TransactionsTable transactions={earnings.transactions} />
     </>
