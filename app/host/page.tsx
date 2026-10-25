@@ -116,7 +116,7 @@ async function HostDashboardContent() {
           >
             <SummaryCard
               label={title}
-              value={value}
+              value={String(value)}
               detail={description}
               icon={icon}
               accent="blue"

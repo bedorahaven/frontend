@@ -166,8 +166,8 @@ async function HostReservationsContent() {
       >
         <div className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none">
           <SummaryCard
-            label="Total reservations"
-            value={reservations.length}
+            label="Total reservations" 
+            value={String(reservations.length)}
             detail="All reservations across your listings"
             icon={CalendarDays}
             accent="blue"
@@ -176,7 +176,7 @@ async function HostReservationsContent() {
         <div className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none">
           <SummaryCard
             label="Ongoing reservations"
-            value={ongoingReservations}
+            value={String(ongoingReservations)}
             detail="Confirmed stays happening today"
             icon={Clock3}
             accent="green"

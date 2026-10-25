@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { Building2, CalendarDays, Wallet, BookmarkCheck } from "lucide-react";
 import { PropertiesTable } from "@/components/host/PropertiesTable";
 import { listHostProperties } from "@/lib/api/properties";
+import { SummaryCard } from "@/components/host/SummaryCard";
 
 export default function HostListingsPage() {
   return (
@@ -105,35 +106,22 @@ async function HostListingsContent() {
       </div>
 
       {/* Summary Cards Section (Horizontal scroll on mobile, responsive grid on desktop) */}
-      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 pt-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0">
-        {stats.map(({ title, value, icon: Icon, description }) => (
-          <div
-            key={title}
-            className="group relative w-[85vw] max-w-[320px] shrink-0 snap-center overflow-hidden rounded-2xl border border-border/70 bg-card p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-accent/50 hover:shadow-lg sm:w-auto sm:max-w-none sm:shrink"
-          >
-            {/* Subtle top theme highlight line */}
-            <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-primary via-accent to-primary opacity-60 transition-opacity group-hover:opacity-100" />
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {title}
-              </span>
-              <div className="rounded-xl bg-accent/10 p-2.5 text-accent transition-transform duration-300 group-hover:scale-110">
-                <Icon className="h-5 w-5" />
-              </div>
+       <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 pt-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0">
+              {stats.map(({ title, value, icon, description }) => (
+                <div
+                  key={title}
+                  className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
+                >
+                  <SummaryCard
+                    label={title}
+                    value={String(value)}
+                    detail={description}
+                    icon={icon}
+                    accent="blue"
+                  />
+                </div>
+              ))}
             </div>
-
-            <div className="mt-5">
-              <div className="text-3xl font-extrabold tracking-tight text-foreground">
-                {value}
-              </div>
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                {description}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
 
       {/* Properties Management Table Section */}
       <div className="space-y-4 pt-2">
