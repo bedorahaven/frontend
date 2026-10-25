@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Building2, CalendarDays, Wallet, BookmarkCheck } from "lucide-react";
-import { PropertiesTable } from "@/components/host/PropertiesTable";
+import { PropertyCards } from "@/components/host/PropertyCards";
 import { SummaryCard } from "@/components/host/SummaryCard";
 import { listHostProperties } from "@/lib/api/properties";
 
@@ -134,7 +134,7 @@ async function HostDashboardContent() {
           </p>
         </div>
 
-        <PropertiesTable properties={latestProperties} />
+        <PropertyCards properties={latestProperties} />
       </div>
     </div>
   );
