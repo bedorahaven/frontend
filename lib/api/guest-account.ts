@@ -1,7 +1,9 @@
 "use server";
 
+import { headers } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getLoginLocation } from "@/lib/auth/login-location";
 
 export async function completeGuestAccount() {
   const supabase = await createClient();
@@ -48,6 +50,7 @@ export async function completeGuestAccount() {
 
   const email = user.email?.trim().toLowerCase() || null;
   const phoneNumber = user.phone?.trim() || null;
+  const loginLocation = getLoginLocation(await headers());
   const fullName =
     profile?.full_name ||
     (email ? email.split("@")[0] : null) ||
@@ -61,8 +64,12 @@ export async function completeGuestAccount() {
       full_name: fullName,
       phone_number: phoneNumber ?? profile?.phone_number ?? null,
       role: profile?.role ?? "guest",
+      city: loginLocation.city ?? undefined,
+      state: loginLocation.state ?? undefined,
+      country: loginLocation.country ?? undefined,
       is_verified: true,
       is_active: true,
+      updated_at: new Date().toISOString(),
     },
     { onConflict: "id" },
   );

@@ -37,7 +37,6 @@ async function AdminDashboardContent() {
       .from("reservations")
       .select("*", { count: "exact", head: true })
       .eq("host_id", user.id),
-    // Check reservations where check-out / end date is in the future
     supabase
       .from("reservations")
       .select("property_id")

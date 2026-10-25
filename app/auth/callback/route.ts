@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isAdminEmail } from '@/lib/auth/admin-emails';
+import { getLoginLocation } from '@/lib/auth/login-location';
 import { createClient } from '@/utils/supabase/server';
 
 export async function GET(request: Request) {
@@ -12,6 +13,7 @@ export async function GET(request: Request) {
   const host = forwardedHost || requestUrl.host;
   const protocol = request.headers.get('x-forwarded-proto') || requestUrl.protocol.replace(':', '');
   const origin = `${protocol}://${host}`;
+  const loginLocation = getLoginLocation(request.headers);
 
   if (code) {
     const supabase = await createClient();
@@ -43,6 +45,7 @@ export async function GET(request: Request) {
             );
           }
 
+          await updateLoginLocation(supabase, loginLocation);
           return NextResponse.redirect(`${origin}/admin`);
         }
 
@@ -51,40 +54,55 @@ export async function GET(request: Request) {
           .from('profiles')
           .select('role')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         const isHostIntent = next.includes('/host');
+        let destination = `${origin}${next}`;
 
         // 1. If profile doesn't exist yet
         if (!profile) {
           if (isHostIntent) {
-            await supabase.from('profiles').upsert({
+            const { error: profileError } = await supabase.from('profiles').upsert({
               id: user.id,
               email: user.email!,
               full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Host',
               avatar_url: user.user_metadata?.avatar_url || null,
               role: 'host',
             });
-            return NextResponse.redirect(`${origin}/host`);
+            if (profileError) {
+              console.error('Host profile creation failed:', profileError.message);
+              return NextResponse.redirect(
+                `${origin}/login?error=Profile%20setup%20failed`,
+              );
+            }
+            destination = `${origin}/host`;
+          } else {
+            destination = `${origin}/lookup`;
           }
-
-          // Default new users without explicit host intent to guest onboarding / lookup
-          return NextResponse.redirect(`${origin}/lookup`);
+        } else {
+          // 2. Host intent management
+          if (isHostIntent && profile.role !== 'host') {
+            destination = `${origin}/onboarding?role=host`;
+          } else if (profile.role === 'host') {
+            destination = `${origin}/host`;
+          } else if (profile.role === 'guest') {
+            destination = `${origin}/lookup`;
+          }
         }
 
-        // 2. Host intent management
-        if (isHostIntent && profile.role !== 'host') {
-          return NextResponse.redirect(`${origin}/onboarding?role=host`);
+        const { error: locationError } = await supabase.rpc(
+          'update_my_login_location',
+          {
+            p_city: loginLocation.city,
+            p_state: loginLocation.state,
+            p_country: loginLocation.country,
+          },
+        );
+        if (locationError) {
+          console.error('Profile login location update failed:', locationError.message);
         }
 
-        if (profile.role === 'host') {
-          return NextResponse.redirect(`${origin}/host`);
-        }
-
-        // 3. Authenticated guest routing requirement
-        if (profile.role === 'guest') {
-          return NextResponse.redirect(`${origin}/lookup`);
-        }
+        return NextResponse.redirect(destination);
       }
 
       return NextResponse.redirect(`${origin}${next}`);
@@ -98,4 +116,19 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.redirect(`${origin}/login?error=Authentication%20failed`);
+}
+
+async function updateLoginLocation(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  location: ReturnType<typeof getLoginLocation>,
+) {
+  const { error } = await supabase.rpc('update_my_login_location', {
+    p_city: location.city,
+    p_state: location.state,
+    p_country: location.country,
+  });
+
+  if (error) {
+    console.error('Admin profile login location update failed:', error.message);
+  }
 }
