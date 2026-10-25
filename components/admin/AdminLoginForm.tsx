@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { ADMIN_EMAILS, isAdminEmail } from "@/lib/auth/admin-emails";
+import { isAdminEmail } from "@/lib/auth/admin-emails";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -139,11 +139,7 @@ export function AdminLoginForm({ errorCode }: AdminLoginFormProps) {
           Continue with Google
         </Button>
 
-        <ul className="space-y-1 border-t border-border pt-4 text-center text-[11px] text-muted-foreground">
-          {ADMIN_EMAILS.map((allowedEmail) => (
-            <li key={allowedEmail}>{allowedEmail}</li>
-          ))}
-        </ul>
+
       </section>
     </main>
   );
