@@ -36,8 +36,8 @@ async function EarningsContent() {
         role="alert"
         className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
       >
-        Your earnings could not be loaded. Please refresh the page or try
-        again later.
+        Your earnings could not be loaded. Please refresh the page or try again
+        later.
       </div>
     );
   }
@@ -50,49 +50,56 @@ async function EarningsContent() {
     .reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
 
   const currency =
-    earnings.transactions.find((transaction) => transaction.currency)?.currency ??
-    "KSh";
+    earnings.transactions.find((transaction) => transaction.currency)
+      ?.currency ?? "KSh";
 
   return (
     <>
-      <section aria-label="Earnings overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          label="Completed earnings"
-          value={formatCurrency(completedEarnings, currency)}
-          detail="Successful payments received"
-          icon={Banknote}
-          accent="green"
-        />
-        <SummaryCard
-          label="Transactions"
-          value={earnings.transactions.length.toLocaleString()}
-          detail="All payment attempts"
-          icon={ReceiptText}
-          accent="blue"
-        />
-        <SummaryCard
-          label="Total bookings"
-          value={earnings.bookingsCount.toLocaleString()}
-          detail="Bookings across your properties"
-          icon={CalendarCheck2}
-          accent="violet"
-        />
-        <SummaryCard
-          label="Your properties"
-          value={earnings.propertiesCount.toLocaleString()}
-          detail={
-            pendingAmount > 0
-              ? `${formatCurrency(pendingAmount, currency)} pending`
-              : "Listings in your host account"
-          }
-          icon={Building2}
-          accent="amber"
-        />
-      </section>
+      {/* <section aria-label="Earnings overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"> */}
+      <div
+        aria-label="Earnings overview"
+        className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 pt-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0"
+      >
+        <div
+          key={"completedEarnings"}
+          className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
+        >
+          <SummaryCard
+            label="Completed earnings"
+            value={formatCurrency(completedEarnings, currency)}
+            detail="Successful payments received"
+            icon={Banknote}
+            accent="green"
+          />
+          <SummaryCard
+            label="Transactions"
+            value={earnings.transactions.length.toLocaleString()}
+            detail="All payment attempts"
+            icon={ReceiptText}
+            accent="blue"
+          />
+          <SummaryCard
+            label="Total bookings"
+            value={earnings.bookingsCount.toLocaleString()}
+            detail="Bookings across your properties"
+            icon={CalendarCheck2}
+            accent="violet"
+          />
+          <SummaryCard
+            label="Your properties"
+            value={earnings.propertiesCount.toLocaleString()}
+            detail={
+              pendingAmount > 0
+                ? `${formatCurrency(pendingAmount, currency)} pending`
+                : "Listings in your host account"
+            }
+            icon={Building2}
+            accent="amber"
+          />
+        </div>
+      </div>
 
-      <TransactionsTable
-        transactions={earnings.transactions}
-      />
+      <TransactionsTable transactions={earnings.transactions} />
     </>
   );
 }
@@ -127,7 +134,6 @@ function PageHeading() {
     </header>
   );
 }
-
 
 function formatCurrency(amount: number, currency: string): string {
   return new Intl.NumberFormat("en-KE", {
