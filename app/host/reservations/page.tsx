@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { CalendarDays, Clock3 } from "lucide-react";
 import { ReservationsTable } from "@/components/host/ReservationsTable";
+import { SummaryCard } from "@/components/host/SummaryCard";
 import type {
   HostReservation,
   HostReservationGuest,
@@ -212,42 +213,5 @@ function ReservationsLoading() {
       </div>
       <div className="h-80 rounded-2xl bg-muted" />
     </div>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  detail,
-  icon: Icon,
-  accent,
-}: {
-  label: string;
-  value: number;
-  detail: string;
-  icon: typeof CalendarDays;
-  accent: "blue" | "green";
-}) {
-  const accentStyles =
-    accent === "green"
-      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-      : "bg-accent/10 text-accent";
-
-  return (
-    <article className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="mt-3 text-3xl font-bold tracking-tight text-foreground">
-            {value.toLocaleString()}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
-        </div>
-        <span className={`flex size-11 items-center justify-center rounded-xl ${accentStyles}`}>
-          <Icon className="size-5" aria-hidden="true" />
-        </span>
-      </div>
-      <div className="absolute -bottom-8 -right-6 size-24 rounded-full bg-current opacity-[0.03]" />
-    </article>
   );
 }
