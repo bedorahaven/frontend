@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isAdminEmail } from '@/lib/auth/admin-emails';
 import { createClient } from '@/utils/supabase/server';
 
 export async function GET(request: Request) {
@@ -20,6 +21,31 @@ export async function GET(request: Request) {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
+        if (next === '/admin') {
+          if (!isAdminEmail(user.email)) {
+            await supabase.auth.signOut();
+            return NextResponse.redirect(
+              `${origin}/admin/login?error=not_authorized`,
+            );
+          }
+
+          const { data: adminAccess, error: adminAccessError } =
+            await supabase.rpc('activate_admin_access');
+
+          if (adminAccessError || adminAccess !== true) {
+            console.error(
+              'Admin access setup failed:',
+              adminAccessError?.message ?? 'The admin account was not allowlisted.',
+            );
+            await supabase.auth.signOut();
+            return NextResponse.redirect(
+              `${origin}/admin/login?error=setup_failed`,
+            );
+          }
+
+          return NextResponse.redirect(`${origin}/admin`);
+        }
+
         // Fetch current profile
         const { data: profile } = await supabase
           .from('profiles')
@@ -63,6 +89,12 @@ export async function GET(request: Request) {
 
       return NextResponse.redirect(`${origin}${next}`);
     }
+  }
+
+  if (next === '/admin') {
+    return NextResponse.redirect(
+      `${origin}/admin/login?error=Authentication%20failed`,
+    );
   }
 
   return NextResponse.redirect(`${origin}/login?error=Authentication%20failed`);
