@@ -231,7 +231,11 @@ export async function listHostProperties() {
   });
 }
 
-export async function listAllPropertiesForAdmin() {
+export async function listAllPropertiesForAdmin(limit?: number) {
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
+    throw new Error('The listing limit must be a positive integer.');
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -252,10 +256,16 @@ export async function listAllPropertiesForAdmin() {
     throw new Error('You do not have permission to manage all listings.');
   }
 
-  const { data: properties, error: propertyError } = await supabase
+  let propertyQuery = supabase
     .from('properties')
     .select('*, property_media (media_url, media_type)')
     .order('created_at', { ascending: false });
+
+  if (limit !== undefined) {
+    propertyQuery = propertyQuery.limit(limit);
+  }
+
+  const { data: properties, error: propertyError } = await propertyQuery;
 
   if (propertyError) {
     console.error('Admin properties fetch error:', propertyError.message);

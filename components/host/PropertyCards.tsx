@@ -41,6 +41,7 @@ type ManagedProperty = PropertyWithMedia & {
 interface PropertyCardsProps {
   properties: ManagedProperty[];
   adminMode?: boolean;
+  pageSize?: number;
 }
 
 const PAGE_SIZE = 6;
@@ -48,6 +49,7 @@ const PAGE_SIZE = 6;
 export function PropertyCards({
   properties,
   adminMode = false,
+  pageSize = PAGE_SIZE,
 }: PropertyCardsProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -74,10 +76,10 @@ export function PropertyCards({
       });
   }, [properties, searchQuery, sortOrder]);
 
-  const totalPages = Math.ceil(filteredProperties.length / PAGE_SIZE) || 1;
+  const totalPages = Math.ceil(filteredProperties.length / pageSize) || 1;
   const paginatedProperties = filteredProperties.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
   );
 
   const handleDelete = async (property: PropertyWithMedia) => {
@@ -95,7 +97,7 @@ export function PropertyCards({
       setCurrentPage((page) =>
         Math.min(
           page,
-          Math.max(1, Math.ceil((filteredProperties.length - 1) / PAGE_SIZE)),
+          Math.max(1, Math.ceil((filteredProperties.length - 1) / pageSize)),
         ),
       );
       router.refresh();
@@ -114,11 +116,12 @@ export function PropertyCards({
           <Building2 className="size-6" />
         </div>
         <h3 className="mt-4 text-base font-bold text-foreground">
-          No properties listed yet
+          {adminMode ? "No listings yet" : "No properties listed yet"}
         </h3>
         <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-          You haven&apos;t added any properties to your hosting account. Create
-          your first listing to start accepting guest bookings.
+          {adminMode
+            ? "There are no listings to manage yet. Create a listing for an existing host to get started."
+            : "You haven&apos;t added any properties to your hosting account. Create your first listing to start accepting guest bookings."}
         </p>
         <Link
           href={adminMode ? "/admin/listings/new" : "/host/listings/new"}
