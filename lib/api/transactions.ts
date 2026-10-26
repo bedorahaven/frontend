@@ -117,6 +117,7 @@ async function getEarningsForRole(adminMode: boolean): Promise<HostEarningsData>
       let transactionsQuery = supabase
         .from("transactions")
         .select("*")
+        .eq("transaction_type", "payment")
         .order("id")
         .range(offset, offset + QUERY_PAGE_SIZE - 1);
 
@@ -181,7 +182,9 @@ async function getEarningsForRole(adminMode: boolean): Promise<HostEarningsData>
     propertiesCount: hostProperties.length,
     bookingsCount: hostBookings.length,
     transactions: hostTransactions.map((transaction) => {
-      const booking = bookingById.get(transaction.booking_id);
+      const booking = transaction.booking_id
+        ? bookingById.get(transaction.booking_id)
+        : undefined;
       const property = booking ? propertyById.get(booking.property_id) ?? null : null;
       return {
         ...transaction,

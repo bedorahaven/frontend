@@ -367,7 +367,7 @@ function BookingProperty({
         {transaction.property?.title || "Property details unavailable"}
       </p>
       <p className="mt-1 text-[11px] text-muted-foreground">
-        Booking #{transaction.booking_id.slice(0, 8)}
+        Booking #{transaction.booking_id?.slice(0, 8) ?? "—"}
         {transaction.property?.city ? ` · ${transaction.property.city}` : ""}
       </p>
       {transaction.booking?.check_in && transaction.booking.check_out && (

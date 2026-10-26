@@ -84,3 +84,66 @@ export async function sendHostBookingNotification(params: {
 
   return data.id;
 }
+
+export async function sendWithdrawalRequestNotification(params: {
+  adminEmails: string[];
+  hostName: string;
+  hostEmail: string;
+  amount: number;
+  methodType: 'bank' | 'mpesa';
+  destination: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured.');
+  }
+
+  const from = process.env.RESEND_FROM_EMAIL;
+  if (!from) {
+    throw new Error(
+      'RESEND_FROM_EMAIL is not configured. Set it to a sender address verified in Resend.',
+    );
+  }
+  if (params.adminEmails.length === 0) {
+    throw new Error('No admin email addresses are available for withdrawal notifications.');
+  }
+
+  const hostName = escapeHtml(params.hostName);
+  const hostEmail = escapeHtml(params.hostEmail);
+  const destination = escapeHtml(params.destination);
+  const subjectHostName = params.hostName.replace(/[\r\n]/g, " ").slice(0, 100);
+  const amount = new Intl.NumberFormat('en-KE', {
+    style: 'currency',
+    currency: 'KES',
+    maximumFractionDigits: 2,
+  }).format(params.amount);
+
+  const resend = new Resend(apiKey);
+  const { data, error } = await resend.emails.send({
+    from,
+    to: params.adminEmails,
+    subject: `Withdrawal request: ${amount} from ${subjectHostName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+        <h2>New host withdrawal request</h2>
+        <p>A host has submitted a withdrawal request for manual processing.</p>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+          <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Host</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${hostName}</td></tr>
+          <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Email</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${hostEmail}</td></tr>
+          <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Amount</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${amount}</td></tr>
+          <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Method</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${params.methodType.toUpperCase()}</td></tr>
+          <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Destination</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${destination}</td></tr>
+        </table>
+        <p>Open the admin earnings page to review the saved payout details and update the request after manual settlement.</p>
+      </div>
+    `,
+  });
+
+  if (error) {
+    throw new Error(`Resend failed to send withdrawal notification: ${error.message}`);
+  }
+  if (!data?.id) {
+    throw new Error('Resend did not return a withdrawal notification ID.');
+  }
+  return data.id;
+}

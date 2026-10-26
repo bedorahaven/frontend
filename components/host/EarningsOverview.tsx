@@ -110,7 +110,7 @@ function formatCurrencySummary(amounts: Map<string, number>): {
     }
   });
 
-  if (formatted.length === 0) return { value: "0", detail: "" };
+  if (formatted.length === 0) return { value: "KES 0", detail: "" };
   if (formatted.length === 1) return { value: formatted[0], detail: "" };
   return {
     value: `${formatted.length} currencies`,

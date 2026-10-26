@@ -2,8 +2,13 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { EarningsOverview } from "@/components/host/EarningsOverview";
+import { WithdrawalRequestsTable } from "@/components/admin/WithdrawalRequestsTable";
 import { getAdminEarnings } from "@/lib/api/transactions";
 import type { HostEarningsData } from "@/lib/api/transactions";
+import {
+  getAdminWithdrawalRequests,
+  type AdminWithdrawalRequest,
+} from "@/lib/api/withdrawals";
 
 export default function AdminEarningsPage() {
   return (
@@ -26,9 +31,13 @@ export default function AdminEarningsPage() {
 async function AdminEarningsContent() {
   await connection();
   let earnings: HostEarningsData;
+  let withdrawalRequests: AdminWithdrawalRequest[];
 
   try {
-    earnings = await getAdminEarnings();
+    [earnings, withdrawalRequests] = await Promise.all([
+      getAdminEarnings(),
+      getAdminWithdrawalRequests(),
+    ]);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load earnings.";
     if (message.includes("signed in")) {
@@ -47,7 +56,12 @@ async function AdminEarningsContent() {
     );
   }
 
-  return <EarningsOverview earnings={earnings} adminMode />;
+  return (
+    <div className="space-y-7">
+      <EarningsOverview earnings={earnings} adminMode />
+      <WithdrawalRequestsTable requests={withdrawalRequests} />
+    </div>
+  );
 }
 
 function EarningsLoading() {
