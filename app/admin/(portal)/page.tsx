@@ -106,9 +106,10 @@ async function AdminDashboardContent() {
   return (
     <div className="p-4 md:p-8 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          <HomeIcon className="size-6" aria-hidden="true" />Dashboard Overview
-          </h1>
+        <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          <HomeIcon className="size-6" aria-hidden="true" />
+          Dashboard Overview
+        </h1>
         <p className="text-sm text-muted-foreground">
           Platform-wide overview of listings and user accounts.
         </p>
@@ -171,7 +172,10 @@ async function AdminDashboardContent() {
 
 function AdminDashboardLoading() {
   return (
-    <div className="animate-pulse space-y-8 p-4 md:p-8" aria-label="Loading dashboard">
+    <div
+      className="animate-pulse space-y-8 p-4 md:p-8"
+      aria-label="Loading dashboard"
+    >
       <div className="h-12 w-64 rounded-xl bg-muted" />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, index) => (

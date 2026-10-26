@@ -10,6 +10,7 @@ import {
   Home,
   LogOut,
   MessageSquare,
+  Star,
   Users,
   Wallet,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const navigationItems = [
   { href: "/admin", label: "Dashboard", icon: Home },
   { href: "/admin/users", label: "Manage Users", icon: Users },
   { href: "/admin/listings", label: "Manage Listings", icon: Building2 },
+  { href: "/admin/reviews", label: "Guest Reviews", icon: Star },
   { href: "/admin/reservations", label: "Reservations", icon: CalendarDays },
   { href: "/admin/earnings", label: "Earnings", icon: Wallet },
   { href: "/admin/messages", label: "Guest Messages", icon: MessageSquare },

@@ -10,6 +10,7 @@ import {
   Home,
   LogOut,
   MessageSquare,
+  Star,
   Wallet,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
@@ -18,6 +19,7 @@ const navigationItems = [
   { href: "/host", label: "Dashboard", icon: Home },
   { href: "/host/listings", label: "Manage Listings", icon: Building2 },
   { href: "/host/reservations", label: "Reservations", icon: CalendarDays },
+  { href: "/host/reviews", label: "Guest Reviews", icon: Star },
   { href: "/host/earnings", label: "Earnings", icon: Wallet },
   { href: "/host/messages", label: "Guest Messages", icon: MessageSquare },
   { href: "/host/help", label: "Help Center", icon: CircleHelp },
