@@ -134,7 +134,7 @@ export async function sendWithdrawalRequestNotification(params: {
           <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Method</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${params.methodType.toUpperCase()}</td></tr>
           <tr><td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Destination</strong></td><td style="padding: 8px; border-bottom: 1px solid #eee;">${destination}</td></tr>
         </table>
-        <p>Open the admin earnings page to review the saved payout details and update the request after manual settlement.</p>
+        <p>Open the admin withdrawals page to review the saved payout details and update the request after manual settlement.</p>
       </div>
     `,
   });
@@ -145,5 +145,46 @@ export async function sendWithdrawalRequestNotification(params: {
   if (!data?.id) {
     throw new Error('Resend did not return a withdrawal notification ID.');
   }
+  return data.id;
+}
+
+export async function sendPayoutVerificationCode(params: {
+  email: string;
+  code: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured.');
+  }
+
+  const from = process.env.RESEND_FROM_EMAIL;
+  if (!from) {
+    throw new Error(
+      'RESEND_FROM_EMAIL is not configured. Set it to a sender address verified in Resend.',
+    );
+  }
+
+  const resend = new Resend(apiKey);
+  const { data, error } = await resend.emails.send({
+    from,
+    to: [params.email],
+    subject: "Verify your Bedora Haven M-Pesa payout method",
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+        <h2>Verify your M-Pesa payout method</h2>
+        <p>Enter this one-time code in Bedora Haven to verify your payout phone number:</p>
+        <p style="font-size: 28px; font-weight: bold; letter-spacing: 8px;">${escapeHtml(params.code)}</p>
+        <p>This code expires in 10 minutes. If you did not request it, you can ignore this email.</p>
+      </div>
+    `,
+  });
+
+  if (error) {
+    throw new Error(`Resend failed to send payout verification code: ${error.message}`);
+  }
+  if (!data?.id) {
+    throw new Error('Resend did not return a payout verification email ID.');
+  }
+
   return data.id;
 }

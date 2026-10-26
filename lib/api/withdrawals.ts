@@ -1,7 +1,12 @@
 "use server";
 
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendWithdrawalRequestNotification } from "@/lib/email";
+import {
+  sendPayoutVerificationCode,
+  sendWithdrawalRequestNotification,
+} from "@/lib/email";
+import { getKenyanBanks } from "@/lib/paystack/banks";
 import type { PayoutMethod, PayoutMethodType, WithdrawalRequest } from "@/types/transactions";
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -20,11 +25,6 @@ export interface AdminWithdrawalRequest extends WithdrawalRequest {
     email: string | null;
     phone_number: string | null;
   } | null;
-}
-
-interface PaystackBank {
-  name: string;
-  code: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -61,7 +61,10 @@ export async function savePayoutMethod(input: {
   bankCode?: string;
   accountNumber?: string;
   phoneNumber?: string;
-}): Promise<{ success: true } | { success: false; error: string }> {
+}): Promise<
+  | { success: true; payoutMethodId: string; verificationRequired: boolean }
+  | { success: false; error: string }
+> {
   const supabase = await createClient();
   if (!input || typeof input !== "object") {
     return { success: false, error: "Enter valid payout details." };
@@ -81,7 +84,7 @@ export async function savePayoutMethod(input: {
     return { success: false, error: "Choose a supported payout method." };
   }
 
-  const bankCode = typeof input.bankCode === "string" ? input.bankCode.trim() : "";
+  let bankCode = typeof input.bankCode === "string" ? input.bankCode.trim() : "";
   const accountNumber =
     typeof input.accountNumber === "string"
       ? input.accountNumber.replace(/\s+/g, "")
@@ -119,16 +122,9 @@ export async function savePayoutMethod(input: {
       };
     }
 
-    let bankResponse: Response;
+    let banks: Awaited<ReturnType<typeof getKenyanBanks>>;
     try {
-      bankResponse = await fetch(
-        "https://api.paystack.co/bank?country=kenya&perPage=100",
-        {
-          headers: { Authorization: `Bearer ${secretKey}` },
-          next: { revalidate: 86_400 },
-          signal: AbortSignal.timeout(10_000),
-        },
-      );
+      banks = await getKenyanBanks();
     } catch (error) {
       console.error("Paystack bank directory request failed:", error);
       return {
@@ -137,40 +133,7 @@ export async function savePayoutMethod(input: {
       };
     }
 
-    let bankBody: unknown;
-    try {
-      bankBody = await bankResponse.json();
-    } catch {
-      console.error("Paystack bank directory returned invalid JSON.");
-      return {
-        success: false,
-        error: "The bank directory returned an invalid response.",
-      };
-    }
-
-    const bankData =
-      isRecord(bankBody) && Array.isArray(bankBody.data)
-        ? bankBody.data
-        : [];
-    const selectedBank = bankData.find(
-      (bank): bank is PaystackBank =>
-        isRecord(bank) &&
-        typeof bank.name === "string" &&
-        typeof bank.code === "string" &&
-        bank.code === bankCode,
-    );
-
-    if (!bankResponse.ok || !isRecord(bankBody) || bankBody.status !== true) {
-      const providerMessage =
-        isRecord(bankBody) && typeof bankBody.message === "string"
-          ? bankBody.message
-          : "Invalid response.";
-      console.error("Paystack bank directory lookup failed:", providerMessage);
-      return {
-        success: false,
-        error: "Unable to verify the selected bank. Please try again.",
-      };
-    }
+    const selectedBank = banks.find((bank) => bank.code === bankCode);
     if (!selectedBank) {
       return {
         success: false,
@@ -178,52 +141,70 @@ export async function savePayoutMethod(input: {
       };
     }
 
-    const resolveUrl = new URL("https://api.paystack.co/bank/resolve");
-    resolveUrl.searchParams.set("account_number", accountNumber);
-    resolveUrl.searchParams.set("bank_code", bankCode);
-
-    let resolveResponse: Response;
-    try {
-      resolveResponse = await fetch(resolveUrl, {
-        headers: { Authorization: `Bearer ${secretKey}` },
-        signal: AbortSignal.timeout(10_000),
-      });
-    } catch (error) {
-      console.error("Paystack payout account resolution request failed:", error);
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profileError || !profile?.full_name) {
+      console.error("Payout bank owner profile lookup failed:", profileError?.message);
       return {
         success: false,
-        error: "Unable to verify this account right now. Please try again.",
+        error: "Unable to verify your account name. Please try again.",
       };
     }
 
-    let resolveBody: unknown;
-    try {
-      resolveBody = await resolveResponse.json();
-    } catch {
-      console.error("Paystack account resolution returned invalid JSON.");
-      return {
-        success: false,
-        error: "Account verification returned an invalid response.",
-      };
+    let resolvedAccountName: string | null = null;
+    let resolvedBankCode: string | null = null;
+    for (const candidateCode of selectedBank.codes) {
+      const resolveUrl = new URL("https://api.paystack.co/bank/resolve");
+      resolveUrl.searchParams.set("account_number", accountNumber);
+      resolveUrl.searchParams.set("bank_code", candidateCode);
+
+      let resolveResponse: Response;
+      try {
+        resolveResponse = await fetch(resolveUrl, {
+          headers: { Authorization: `Bearer ${secretKey}` },
+          signal: AbortSignal.timeout(10_000),
+        });
+      } catch (error) {
+        console.error("Paystack payout account resolution request failed:", error);
+        return {
+          success: false,
+          error: "Unable to verify this account right now. Please try again.",
+        };
+      }
+
+      let resolveBody: unknown;
+      try {
+        resolveBody = await resolveResponse.json();
+      } catch {
+        console.error("Paystack account resolution returned invalid JSON.");
+        return {
+          success: false,
+          error: "Account verification returned an invalid response.",
+        };
+      }
+
+      const candidateData =
+        isRecord(resolveBody) && isRecord(resolveBody.data)
+          ? resolveBody.data
+          : null;
+      if (
+        resolveResponse.ok &&
+        isRecord(resolveBody) &&
+        resolveBody.status === true &&
+        candidateData &&
+        typeof candidateData.account_name === "string" &&
+        candidateData.account_name.trim().length >= 2
+      ) {
+        resolvedAccountName = candidateData.account_name.trim();
+        resolvedBankCode = candidateCode;
+        break;
+      }
     }
 
-    const resolvedData =
-      isRecord(resolveBody) && isRecord(resolveBody.data)
-        ? resolveBody.data
-        : null;
-    if (
-      !resolveResponse.ok ||
-      !isRecord(resolveBody) ||
-      resolveBody.status !== true ||
-      !resolvedData ||
-      typeof resolvedData.account_name !== "string" ||
-      resolvedData.account_name.trim().length < 2
-    ) {
-      const providerMessage =
-        isRecord(resolveBody) && typeof resolveBody.message === "string"
-          ? resolveBody.message
-          : "Invalid response.";
-      console.error("Paystack account resolution failed:", providerMessage);
+    if (!resolvedAccountName || !resolvedBankCode) {
       return {
         success: false,
         error:
@@ -232,10 +213,32 @@ export async function savePayoutMethod(input: {
     }
 
     bankName = selectedBank.name;
-    accountName = resolvedData.account_name.trim().slice(0, 100);
+    accountName = resolvedAccountName.slice(0, 100);
+    bankCode = resolvedBankCode;
+
+    if (!hasMatchingName(profile.full_name, accountName)) {
+      return {
+        success: false,
+        error:
+          "The bank account name does not match your registered profile name. Update your profile or use an account in your name.",
+      };
+    }
   }
 
-  const { error } = await supabase.from("payout_methods").insert({
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (error) {
+    console.error("Payout method admin client setup failed:", error);
+    return {
+      success: false,
+      error: "Payout verification is temporarily unavailable.",
+    };
+  }
+
+  const { data: inserted, error } = await admin
+    .from("payout_methods")
+    .insert({
     host_id: user.id,
     method_type: input.methodType,
     bank_name: input.methodType === "bank" ? bankName : null,
@@ -243,15 +246,411 @@ export async function savePayoutMethod(input: {
     account_name: input.methodType === "bank" ? accountName : null,
     account_number: input.methodType === "bank" ? accountNumber : null,
     phone_number: phoneNumber,
-  });
+    verification_status: input.methodType === "bank" ? "verified" : "pending",
+    verified_at: input.methodType === "bank" ? new Date().toISOString() : null,
+  })
+    .select("id")
+    .single();
 
-  if (error) {
-    console.error("Payout method save failed:", error.message);
+  if (error || !inserted) {
+    console.error("Payout method save failed:", error?.message);
     return { success: false, error: "Unable to save payout method." };
   }
 
   revalidatePath("/host/withdrawals");
+  return {
+    success: true,
+    payoutMethodId: inserted.id,
+    verificationRequired: input.methodType === "mpesa",
+  };
+}
+
+export async function beginPayoutMethodVerification(
+  payoutMethodId: string,
+): Promise<
+  | { success: true; challengeId: string; maskedEmail: string }
+  | { success: false; error: string }
+> {
+  const supabase = await createClient();
+  let user: { id: string };
+  try {
+    user = await requireRole(supabase, "host");
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Host access is required.",
+    };
+  }
+  if (!/^[0-9a-f-]{36}$/i.test(payoutMethodId)) {
+    return { success: false, error: "Choose a valid payout method." };
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  const email = authData.user?.email?.trim();
+  if (authError || !email) {
+    return {
+      success: false,
+      error: "Add a valid email address to your account before verifying M-Pesa.",
+    };
+  }
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (error) {
+    console.error("Payout verification admin client setup failed:", error);
+    return { success: false, error: "Email verification is temporarily unavailable." };
+  }
+  const { data: method, error: methodError } = await admin
+    .from("payout_methods")
+    .select("id, method_type, verification_status")
+    .eq("id", payoutMethodId)
+    .eq("host_id", user.id)
+    .maybeSingle();
+  if (methodError || !method || method.method_type !== "mpesa") {
+    console.error("Payout verification method lookup failed:", methodError?.message);
+    return { success: false, error: "The M-Pesa payout method is unavailable." };
+  }
+  if (method.verification_status === "verified") {
+    return { success: false, error: "This M-Pesa payout method is already verified." };
+  }
+
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { data: recentCodes, error: rateLimitError } = await admin
+    .from("payout_method_verification_codes")
+    .select("created_at")
+    .eq("host_id", user.id)
+    .gte("created_at", oneHourAgo)
+    .order("created_at", { ascending: false })
+    .limit(5);
+  if (rateLimitError) {
+    console.error("Payout verification rate limit check failed:", rateLimitError.message);
+    return { success: false, error: "Unable to start email verification." };
+  }
+  if (recentCodes?.length === 5) {
+    return {
+      success: false,
+      error: "Too many verification codes requested. Try again in an hour.",
+    };
+  }
+  const latestCode = recentCodes?.[0];
+  if (
+    latestCode &&
+    Date.now() - new Date(latestCode.created_at).getTime() < 60_000
+  ) {
+    return {
+      success: false,
+      error: "Wait one minute before requesting another verification code.",
+    };
+  }
+
+  const { error: invalidateError } = await admin
+    .from("payout_method_verification_codes")
+    .update({ used_at: new Date().toISOString() })
+    .eq("host_id", user.id)
+    .is("used_at", null);
+  if (invalidateError) {
+    console.error("Previous payout verification codes could not be invalidated:", invalidateError.message);
+    return { success: false, error: "Unable to start email verification." };
+  }
+
+  const challengeId = randomUUID();
+  const code = randomInt(100_000, 1_000_000).toString();
+  const codeHash = hashPayoutCode(user.id, payoutMethodId, challengeId, code);
+  const { error: insertError } = await admin
+    .from("payout_method_verification_codes")
+    .insert({
+      id: challengeId,
+      host_id: user.id,
+      payout_method_id: payoutMethodId,
+      code_hash: codeHash,
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    });
+  if (insertError) {
+    console.error("Payout verification challenge creation failed:", insertError.message);
+    return { success: false, error: "Unable to start email verification." };
+  }
+
+  try {
+    await sendPayoutVerificationCode({ email, code });
+  } catch (error) {
+    console.error("Payout verification email failed:", error);
+    await admin
+      .from("payout_method_verification_codes")
+      .update({ used_at: new Date().toISOString() })
+      .eq("id", challengeId);
+    return {
+      success: false,
+      error: "We could not email your verification code. Please try again later.",
+    };
+  }
+
+  return {
+    success: true,
+    challengeId,
+    maskedEmail: maskEmail(email),
+  };
+}
+
+export async function verifyPayoutMethodCode(
+  payoutMethodId: string,
+  challengeId: string,
+  inputCode: string,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const supabase = await createClient();
+  let user: { id: string };
+  try {
+    user = await requireRole(supabase, "host");
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Host access is required.",
+    };
+  }
+  if (
+    !/^[0-9a-f-]{36}$/i.test(payoutMethodId) ||
+    !/^[0-9a-f-]{36}$/i.test(challengeId) ||
+    !/^\d{6}$/.test(inputCode)
+  ) {
+    return { success: false, error: "Enter the six-digit email code." };
+  }
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (error) {
+    console.error("Payout verification admin client setup failed:", error);
+    return { success: false, error: "Email verification is temporarily unavailable." };
+  }
+  const { data: challenge, error } = await admin
+    .from("payout_method_verification_codes")
+    .select("id, payout_method_id, code_hash, attempts, expires_at, used_at")
+    .eq("id", challengeId)
+    .eq("host_id", user.id)
+    .eq("payout_method_id", payoutMethodId)
+    .maybeSingle();
+  if (error || !challenge) {
+    console.error("Payout verification challenge lookup failed:", error?.message);
+    return { success: false, error: "This verification code is unavailable." };
+  }
+  if (challenge.used_at) {
+    return { success: false, error: "This verification code has already been used." };
+  }
+  if (new Date(challenge.expires_at).getTime() <= Date.now()) {
+    await admin
+      .from("payout_method_verification_codes")
+      .update({ used_at: new Date().toISOString() })
+      .eq("id", challengeId);
+    return { success: false, error: "This code has expired. Request a new one." };
+  }
+  if (challenge.attempts >= 5) {
+    return {
+      success: false,
+      error: "Too many incorrect attempts. Request a new verification code.",
+    };
+  }
+
+  const expectedHash = hashPayoutCode(
+    user.id,
+    payoutMethodId,
+    challengeId,
+    inputCode,
+  );
+  const valid =
+    challenge.code_hash.length === expectedHash.length &&
+    timingSafeEqual(
+      Buffer.from(challenge.code_hash, "hex"),
+      Buffer.from(expectedHash, "hex"),
+    );
+  if (!valid) {
+      const { error: attemptError } = await admin.rpc(
+        "increment_payout_verification_attempt",
+        {
+          verification_id: challengeId,
+          verification_host_id: user.id,
+        },
+      );
+    if (attemptError) {
+      console.error("Payout verification attempt update failed:", attemptError.message);
+    }
+    return { success: false, error: "That code is incorrect. Check it and try again." };
+  }
+
+  const verifiedAt = new Date().toISOString();
+  const { data: consumedCode, error: consumeError } = await admin
+    .from("payout_method_verification_codes")
+    .update({ used_at: verifiedAt })
+    .eq("id", challengeId)
+    .is("used_at", null)
+    .select("id")
+    .maybeSingle();
+  if (consumeError || !consumedCode) {
+    console.error("Payout verification code consumption failed:", consumeError?.message);
+    return {
+      success: false,
+      error: "This verification code has already been used. Request a new one.",
+    };
+  }
+
+  const { data: updatedMethod, error: updateError } = await admin
+    .from("payout_methods")
+    .update({ verification_status: "verified", verified_at: verifiedAt })
+    .eq("id", payoutMethodId)
+    .eq("host_id", user.id)
+    .eq("method_type", "mpesa")
+    .select("id")
+    .maybeSingle();
+  if (updateError || !updatedMethod) {
+    console.error("Payout method verification update failed:", updateError?.message);
+    return { success: false, error: "Unable to verify this payout method." };
+  }
+
+  revalidatePath("/host/withdrawals");
   return { success: true };
+}
+
+export async function verifyBankPayoutMethod(
+  payoutMethodId: string,
+): Promise<{ success: true } | { success: false; error: string }> {
+  const supabase = await createClient();
+  let user: { id: string };
+  try {
+    user = await requireRole(supabase, "host");
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Host access is required.",
+    };
+  }
+  if (!/^[0-9a-f-]{36}$/i.test(payoutMethodId)) {
+    return { success: false, error: "Choose a valid payout method." };
+  }
+
+  const secretKey = process.env.PAYSTACK_SECRET_KEY;
+  if (!secretKey) {
+    console.error("Paystack payout account verification failed: missing secret key.");
+    return {
+      success: false,
+      error: "Bank account verification is temporarily unavailable.",
+    };
+  }
+
+  const admin = createAdminClient();
+  const [{ data: method, error: methodError }, { data: profile, error: profileError }] =
+    await Promise.all([
+      admin
+        .from("payout_methods")
+        .select("id, bank_code, bank_name, account_number, method_type")
+        .eq("id", payoutMethodId)
+        .eq("host_id", user.id)
+        .maybeSingle(),
+      supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+    ]);
+  if (
+    methodError ||
+    !method ||
+    method.method_type !== "bank" ||
+    !method.bank_code ||
+    !method.account_number
+  ) {
+    console.error("Bank payout method lookup failed:", methodError?.message);
+    return { success: false, error: "The bank payout method is unavailable." };
+  }
+  if (profileError || !profile?.full_name) {
+    console.error("Bank payout owner profile lookup failed:", profileError?.message);
+    return { success: false, error: "Unable to verify your registered name." };
+  }
+
+  const resolveUrl = new URL("https://api.paystack.co/bank/resolve");
+  resolveUrl.searchParams.set("account_number", method.account_number);
+  resolveUrl.searchParams.set("bank_code", method.bank_code);
+  let response: Response;
+  try {
+    response = await fetch(resolveUrl, {
+      headers: { Authorization: `Bearer ${secretKey}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (error) {
+    console.error("Paystack bank account re-verification request failed:", error);
+    return { success: false, error: "Unable to verify this bank account right now." };
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return { success: false, error: "Account verification returned an invalid response." };
+  }
+  const resolvedData =
+    isRecord(body) && isRecord(body.data) ? body.data : null;
+  if (
+    !response.ok ||
+    !isRecord(body) ||
+    body.status !== true ||
+    !resolvedData ||
+    typeof resolvedData.account_name !== "string" ||
+    !hasMatchingName(profile.full_name, resolvedData.account_name)
+  ) {
+    return {
+      success: false,
+      error:
+        "The bank account name does not match your registered profile name, or the account could not be resolved.",
+    };
+  }
+
+  const verifiedAt = new Date().toISOString();
+  const { error: updateError } = await admin
+    .from("payout_methods")
+    .update({
+      account_name: resolvedData.account_name.trim().slice(0, 100),
+      verification_status: "verified",
+      verified_at: verifiedAt,
+    })
+    .eq("id", method.id)
+    .eq("host_id", user.id);
+  if (updateError) {
+    console.error("Bank payout verification update failed:", updateError.message);
+    return { success: false, error: "Unable to update the bank verification status." };
+  }
+
+  revalidatePath("/host/withdrawals");
+  return { success: true };
+}
+
+function hashPayoutCode(
+  hostId: string,
+  payoutMethodId: string,
+  challengeId: string,
+  code: string,
+): string {
+  const secret =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SECRET_KEY ??
+    process.env.PAYSTACK_SECRET_KEY;
+  if (!secret) {
+    throw new Error("A server-side secret is required to hash payout codes.");
+  }
+  return createHmac("sha256", secret)
+    .update(`${hostId}:${payoutMethodId}:${challengeId}:${code}`)
+    .digest("hex");
+}
+
+function maskEmail(email: string): string {
+  const [localPart, domain] = email.split("@");
+  if (!localPart || !domain) return "your email";
+  return `${localPart[0]}***@${domain}`;
+}
+
+function hasMatchingName(profileName: string, bankName: string): boolean {
+  const normalizeTokens = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase()
+      .match(/[\p{L}\p{N}]+/gu)
+      ?.filter((token) => token.length > 1) ?? [];
+  const profileTokens = new Set(normalizeTokens(profileName));
+  return normalizeTokens(bankName).some((token) => profileTokens.has(token));
 }
 
 export async function requestWithdrawal(
@@ -293,6 +692,12 @@ export async function requestWithdrawal(
   if (methodError || !method) {
     console.error("Withdrawal payout method lookup failed:", methodError?.message);
     return { success: false, error: "The selected payout method is unavailable." };
+  }
+  if (method.verification_status !== "verified") {
+    return {
+      success: false,
+      error: "Verify this payout method before requesting a withdrawal.",
+    };
   }
 
   const { data: inserted, error: insertError } = await supabase
@@ -371,7 +776,7 @@ export async function requestWithdrawal(
   } catch (error) {
     console.error("Admin withdrawal email notification failed:", error);
     notificationWarning =
-      "Your request is recorded, but the admin email notification could not be sent. Admins can still see it in the earnings page.";
+      "Your request is recorded, but the admin email notification could not be sent. Admins can still see it on the withdrawals page.";
   }
 
   return { success: true, notificationWarning };
@@ -444,8 +849,8 @@ export async function updateWithdrawalRequestStatus(
     };
   }
 
-  revalidatePath("/admin/earnings");
-  revalidatePath("/host/earnings");
+  revalidatePath("/admin/withdrawals");
+  revalidatePath("/host/withdrawals");
   return { success: true };
 }
 

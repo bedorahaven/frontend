@@ -1,23 +1,6 @@
 import { NextResponse } from "next/server";
+import { getKenyanBanks } from "@/lib/paystack/banks";
 import { createClient } from "@/utils/supabase/server";
-
-interface PaystackBank {
-  name: string;
-  code: string;
-}
-
-function isPaystackBank(value: unknown): value is PaystackBank {
-  return (
-    isRecord(value) &&
-    typeof value.name === "string" &&
-    typeof value.code === "string" &&
-    value.code.length > 0
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 export async function GET() {
   const supabase = await createClient();
@@ -47,70 +30,21 @@ export async function GET() {
     return NextResponse.json({ error: "Only hosts can load payout banks." }, { status: 403 });
   }
 
-  const secretKey = process.env.PAYSTACK_SECRET_KEY;
-  if (!secretKey) {
-    console.error("Kenyan payout bank lookup failed: PAYSTACK_SECRET_KEY is not configured.");
-    return NextResponse.json(
-      { error: "Bank transfers are temporarily unavailable." },
-      { status: 503 },
-    );
-  }
-
-  let response: Response;
   try {
-    response = await fetch(
-      "https://api.paystack.co/bank?country=kenya&perPage=100",
-      {
-        headers: { Authorization: `Bearer ${secretKey}` },
-        next: { revalidate: 86_400 },
-      },
-    );
+    const banks = await getKenyanBanks();
+    return NextResponse.json({
+      banks: banks.map(({ name, code }) => ({ name, code })),
+    });
   } catch (error) {
-    console.error("Paystack Kenyan bank lookup request failed:", error);
+    console.error("Paystack Kenyan bank lookup failed:", error);
+    const errorMessage =
+      error instanceof Error &&
+      error.message === "PAYSTACK_SECRET_KEY is not configured."
+        ? "Bank transfers are temporarily unavailable."
+        : "Unable to load Kenyan banks from Paystack.";
     return NextResponse.json(
-      { error: "Unable to reach the bank directory. Please try again." },
+      { error: errorMessage },
       { status: 502 },
     );
   }
-
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    console.error("Paystack bank directory returned invalid JSON.");
-    return NextResponse.json(
-      { error: "The bank directory returned an invalid response." },
-      { status: 502 },
-    );
-  }
-
-  if (
-    !response.ok ||
-    !isRecord(body) ||
-    body.status !== true ||
-    !Array.isArray(body.data)
-  ) {
-    const providerMessage =
-      isRecord(body) && typeof body.message === "string" ? body.message : "Invalid response.";
-    console.error("Paystack Kenyan bank lookup failed:", providerMessage);
-    return NextResponse.json(
-      { error: "Unable to load Kenyan banks from Paystack." },
-      { status: 502 },
-    );
-  }
-
-  const banks = body.data
-    .filter(isPaystackBank)
-    .map(({ name, code }) => ({ name, code }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  if (banks.length === 0) {
-    console.error("Paystack returned no Kenyan bank entries.");
-    return NextResponse.json(
-      { error: "No Kenyan banks are currently available from Paystack." },
-      { status: 502 },
-    );
-  }
-
-  return NextResponse.json({ banks });
 }

@@ -2,9 +2,16 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, LoaderCircle, Plus, Wallet } from "lucide-react";
+import { Banknote, LoaderCircle, Plus, ShieldCheck, Wallet } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -14,8 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  beginPayoutMethodVerification,
   requestWithdrawal,
   savePayoutMethod,
+  verifyBankPayoutMethod,
+  verifyPayoutMethodCode,
 } from "@/lib/api/withdrawals";
 import type { PayoutMethod, WithdrawalRequest } from "@/types/transactions";
 
@@ -46,6 +56,13 @@ export function WithdrawalPanel({
   const [accountNumber, setAccountNumber] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [showMethodForm, setShowMethodForm] = useState(payoutMethods.length === 0);
+  const [verificationDialog, setVerificationDialog] = useState<{
+    payoutMethodId: string;
+    challengeId: string;
+    maskedEmail: string;
+  } | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationError, setVerificationError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,19 +147,121 @@ export function WithdrawalPanel({
         return;
       }
 
-      toast.success("Payout method saved.");
       setShowMethodForm(false);
       setBankCode("");
       setAccountNumber("");
       setPhoneNumber("");
+      router.refresh();
+
+      if (result.verificationRequired) {
+        let challenge: Awaited<
+          ReturnType<typeof beginPayoutMethodVerification>
+        >;
+        try {
+          challenge = await beginPayoutMethodVerification(result.payoutMethodId);
+        } catch (error) {
+          console.error("Starting M-Pesa email verification failed:", error);
+          toast.error("Unable to send a verification code. Please try again.");
+          return;
+        }
+        if (!challenge.success) {
+          toast.error(challenge.error);
+          router.refresh();
+          return;
+        }
+        setVerificationDialog({
+          payoutMethodId: result.payoutMethodId,
+          challengeId: challenge.challengeId,
+          maskedEmail: challenge.maskedEmail,
+        });
+        setVerificationCode("");
+        setVerificationError(null);
+        toast.success("Verification code sent to your account email.");
+      } else {
+        toast.success("Verified payout method saved.");
+      }
+    });
+  };
+
+  const startEmailVerification = (payoutMethodId: string) => {
+    startTransition(async () => {
+      let result: Awaited<
+        ReturnType<typeof beginPayoutMethodVerification>
+      >;
+      try {
+        result = await beginPayoutMethodVerification(payoutMethodId);
+      } catch (error) {
+        console.error("Starting payout email verification failed:", error);
+        toast.error("Unable to send a verification code. Please try again.");
+        return;
+      }
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      setVerificationDialog({
+        payoutMethodId,
+        challengeId: result.challengeId,
+        maskedEmail: result.maskedEmail,
+      });
+      setVerificationCode("");
+      setVerificationError(null);
+    });
+  };
+
+  const startBankVerification = (payoutMethodId: string) => {
+    startTransition(async () => {
+      let result: Awaited<ReturnType<typeof verifyBankPayoutMethod>>;
+      try {
+        result = await verifyBankPayoutMethod(payoutMethodId);
+      } catch (error) {
+        console.error("Verifying bank payout method failed:", error);
+        toast.error("Unable to verify this bank account. Please try again.");
+        return;
+      }
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Bank payout method verified.");
+      router.refresh();
+    });
+  };
+
+  const handleVerifyCode = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!verificationDialog) return;
+
+    startTransition(async () => {
+      let result: Awaited<ReturnType<typeof verifyPayoutMethodCode>>;
+      try {
+        result = await verifyPayoutMethodCode(
+          verificationDialog.payoutMethodId,
+          verificationDialog.challengeId,
+          verificationCode,
+        );
+      } catch (error) {
+        console.error("Payout email code verification failed:", error);
+        setVerificationError("Unable to verify the code. Please try again.");
+        return;
+      }
+      if (!result.success) {
+        setVerificationError(result.error);
+        return;
+      }
+
+      toast.success("M-Pesa payout method verified.");
+      setVerificationDialog(null);
+      setVerificationCode("");
+      setVerificationError(null);
       router.refresh();
     });
   };
 
   const handleRequest = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedMethod) {
-      toast.error("Add and select a payout method first.");
+    if (!selectedMethod || selectedMethod.verification_status !== "verified") {
+      toast.error("Select a verified payout method first.");
       return;
     }
 
@@ -213,39 +332,71 @@ export function WithdrawalPanel({
           {payoutMethods.length > 0 ? (
             <div className="grid gap-2">
               {payoutMethods.map((method) => (
-                <label
-                  key={method.id}
-                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
-                    activeMethodId === method.id
-                      ? "border-accent bg-accent/5"
-                      : "border-border hover:bg-muted/50"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="payoutMethod"
-                    value={method.id}
-                    checked={activeMethodId === method.id}
-                    onChange={() => setSelectedMethodId(method.id)}
-                    className="mt-1 accent-primary"
-                  />
-                  <Banknote
-                    className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <span className="min-w-0 text-xs">
-                    <span className="block font-semibold text-foreground">
-                      {method.method_type === "bank"
-                        ? method.bank_name
-                        : "M-Pesa"}
+                <div key={method.id} className="space-y-2">
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
+                      activeMethodId === method.id
+                        ? "border-accent bg-accent/5"
+                        : "border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payoutMethod"
+                      value={method.id}
+                      checked={activeMethodId === method.id}
+                      onChange={() => setSelectedMethodId(method.id)}
+                      className="mt-1 accent-primary"
+                    />
+                    <Banknote
+                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 flex-1 text-xs">
+                      <span className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
+                        {method.method_type === "bank"
+                          ? method.bank_name
+                          : "M-Pesa"}
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            method.verification_status === "verified"
+                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                              : "bg-amber-500/10 text-amber-800 dark:text-amber-300"
+                          }`}
+                        >
+                          {method.verification_status === "verified" && (
+                            <ShieldCheck className="size-3" aria-hidden="true" />
+                          )}
+                          {method.verification_status === "verified"
+                            ? "Verified"
+                            : "Verification required"}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block truncate text-muted-foreground">
+                        {method.method_type === "bank"
+                          ? `${method.account_name} · Account ending ${method.account_number?.slice(-4)}`
+                          : method.phone_number}
+                      </span>
                     </span>
-                    <span className="mt-0.5 block truncate text-muted-foreground">
+                  </label>
+                  {method.verification_status !== "verified" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() =>
+                        method.method_type === "bank"
+                          ? startBankVerification(method.id)
+                          : startEmailVerification(method.id)
+                      }
+                    >
                       {method.method_type === "bank"
-                        ? `${method.account_name} · Account ending ${method.account_number?.slice(-4)}`
-                        : method.phone_number}
-                    </span>
-                  </span>
-                </label>
+                        ? "Verify bank account"
+                        : "Send email verification code"}
+                    </Button>
+                  )}
+                </div>
               ))}
             </div>
           ) : (
@@ -324,8 +475,8 @@ export function WithdrawalPanel({
                       className="h-10"
                     />
                     <span className="block text-[11px] text-muted-foreground">
-                      We verify the account with Paystack and save the account
-                      name returned by the bank.
+                      We verify the account with third-party provider and save the account
+                      name returned by the bank for future withdrawals.
                     </span>
                   </label>
                 </>
@@ -403,9 +554,19 @@ export function WithdrawalPanel({
             Requests greater than your available balance are accepted and
             flagged for manual admin review. Settlement is handled manually.
           </p>
+          {selectedMethod &&
+            selectedMethod.verification_status !== "verified" && (
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                Verify this payout method before requesting a withdrawal.
+              </p>
+            )}
           <Button
             type="submit"
-            disabled={isPending || payoutMethods.length === 0}
+            disabled={
+              isPending ||
+              !selectedMethod ||
+              selectedMethod.verification_status !== "verified"
+            }
             className="w-full"
           >
             {isPending && <LoaderCircle className="size-4 animate-spin" />}
@@ -415,6 +576,69 @@ export function WithdrawalPanel({
       </div>
 
       <WithdrawalHistory requests={requests} />
+
+      <Dialog
+        open={verificationDialog !== null}
+        onOpenChange={(open) => {
+          if (!open && !isPending) {
+            setVerificationDialog(null);
+            setVerificationError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Verify your M-Pesa number</DialogTitle>
+            <DialogDescription>
+              Enter the six-digit code we sent to{" "}
+              {verificationDialog?.maskedEmail || "your account email"}. It
+              expires in 10 minutes.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleVerifyCode} className="space-y-4">
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-foreground">
+                Verification code
+              </span>
+              <Input
+                required
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={verificationCode}
+                onChange={(event) =>
+                  setVerificationCode(event.target.value.replace(/\D/g, ""))
+                }
+                className="h-11 text-center text-lg tracking-[0.4em]"
+                aria-label="Six-digit email verification code"
+              />
+            </label>
+            {verificationError && (
+              <p role="alert" className="text-xs text-destructive">
+                {verificationError}
+              </p>
+            )}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isPending}
+                onClick={() => setVerificationDialog(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isPending || verificationCode.length !== 6}
+              >
+                {isPending && <LoaderCircle className="size-4 animate-spin" />}
+                Verify M-Pesa number
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

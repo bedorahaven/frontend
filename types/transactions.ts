@@ -50,6 +50,8 @@ export interface PayoutMethod {
   account_name: string | null;
   account_number: string | null;
   phone_number: string | null;
+  verification_status: 'pending' | 'verified' | 'failed';
+  verified_at: string | null;
   created_at: string;
   updated_at: string;
 }
