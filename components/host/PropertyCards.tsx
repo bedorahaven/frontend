@@ -34,13 +34,21 @@ import { deleteProperty } from "@/lib/api/properties";
 import type { PropertyWithMedia } from "@/types/properties";
 import toast from "react-hot-toast";
 
+type ManagedProperty = PropertyWithMedia & {
+  host_profile?: { full_name: string; email: string | null } | null;
+};
+
 interface PropertyCardsProps {
-  properties: PropertyWithMedia[];
+  properties: ManagedProperty[];
+  adminMode?: boolean;
 }
 
 const PAGE_SIZE = 6;
 
-export function PropertyCards({ properties }: PropertyCardsProps) {
+export function PropertyCards({
+  properties,
+  adminMode = false,
+}: PropertyCardsProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -75,7 +83,7 @@ export function PropertyCards({ properties }: PropertyCardsProps) {
   const handleDelete = async (property: PropertyWithMedia) => {
     setDeletingPropertyId(property.id);
     try {
-      const result = await deleteProperty(property.id);
+      const result = await deleteProperty(property.id, adminMode);
       if (!result.success) {
         toast.error(result.error || "Unable to delete this listing.");
         return;
@@ -113,7 +121,7 @@ export function PropertyCards({ properties }: PropertyCardsProps) {
           your first listing to start accepting guest bookings.
         </p>
         <Link
-          href="/host/listings/new"
+          href={adminMode ? "/admin/listings/new" : "/host/listings/new"}
           className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
         >
           <Plus className="size-4" />
@@ -154,7 +162,7 @@ export function PropertyCards({ properties }: PropertyCardsProps) {
               {sortOrder === "desc" ? "Newest" : "Oldest"}
             </Button>
             <Link
-              href="/host/listings/new"
+              href={adminMode ? "/admin/listings/new" : "/host/listings/new"}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
             >
               <Plus className="size-4" />
@@ -219,6 +227,14 @@ export function PropertyCards({ properties }: PropertyCardsProps) {
                             .join(", ")}
                         </span>
                       </p>
+                      {adminMode && (
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          Host: {property.host_profile?.full_name || "Unknown"}
+                          {property.host_profile?.email
+                            ? ` · ${property.host_profile.email}`
+                            : ""}
+                        </p>
+                      )}
                     </div>
                     <p className="shrink-0 text-sm font-semibold text-foreground">
                       {price}
@@ -246,7 +262,11 @@ export function PropertyCards({ properties }: PropertyCardsProps) {
 
                   <div className="mt-3 flex items-center justify-end gap-2">
                     <Link
-                      href={`/host/listings/${property.id}/edit`}
+                      href={
+                        adminMode
+                          ? `/admin/listings/${property.id}/edit`
+                          : `/host/listings/${property.id}/edit`
+                      }
                       aria-label={`Edit ${property.title}`}
                       title="Edit listing"
                       className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition-colors hover:bg-accent/10 hover:text-accent"

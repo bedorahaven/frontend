@@ -34,6 +34,12 @@ import type {
 import { createProperty, updateProperty } from "@/lib/api/properties";
 import { RichTextEditor } from "../ui/rich-text-editor";
 
+interface HostOption {
+  id: string;
+  full_name: string;
+  email: string | null;
+}
+
 export const CATEGORIES: { label: string; value: PropertyCategory }[] = [
   { label: "Trending", value: "trending" },
   { label: "Beachfront (Coast & Diani)", value: "beachfront" },
@@ -133,12 +139,20 @@ function getMediaCounts(items: Pick<UploadedMedia, "type">[]) {
 
 export function ListingForm({
   initialProperty,
+  adminMode = false,
+  hostOptions = [],
 }: {
   initialProperty?: PropertyWithMedia;
+  adminMode?: boolean;
+  hostOptions?: HostOption[];
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [selectedHostId, setSelectedHostId] = useState(
+    initialProperty?.host_id ?? "",
+  );
+  const listingsPath = adminMode ? "/admin/listings" : "/host/listings";
 
   const [title, setTitle] = useState(initialProperty?.title ?? "");
   const [description, setDescription] = useState(
@@ -307,6 +321,11 @@ export function ListingForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (adminMode && !selectedHostId) {
+      toast.error("Select a host for this listing.");
+      return;
+    }
+
     const trimmedTitle = title.trim();
     const trimmedDescription = description.trim();
     const trimmedCountry = country.trim();
@@ -420,8 +439,17 @@ export function ListingForm({
       }));
 
       const result = initialProperty
-        ? await updateProperty(initialProperty.id, propertyInput, mediaInput)
-        : await createProperty(propertyInput, mediaInput);
+        ? await updateProperty(
+            initialProperty.id,
+            propertyInput,
+            mediaInput,
+            adminMode ? selectedHostId : undefined,
+          )
+        : await createProperty(
+            propertyInput,
+            mediaInput,
+            adminMode ? selectedHostId : undefined,
+          );
 
       if (result.success) {
         toast.success(
@@ -429,7 +457,7 @@ export function ListingForm({
             ? "Property updated successfully!"
             : "Property created successfully!",
         );
-        router.push("/host/listings");
+        router.push(listingsPath);
         router.refresh();
       } else {
         toast.error(
@@ -450,7 +478,7 @@ export function ListingForm({
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link
-          href="/host/listings"
+          href={listingsPath}
           className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -468,6 +496,35 @@ export function ListingForm({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        {adminMode && (
+          <section className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div>
+              <h2 className="text-base font-bold">Listing owner</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Assign this property to the host who owns and manages it.
+              </p>
+            </div>
+            <Select
+              value={selectedHostId}
+              onValueChange={(value) =>
+                setSelectedHostId(typeof value === "string" ? value : "")
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a host" />
+              </SelectTrigger>
+              <SelectContent>
+                {hostOptions.map((host) => (
+                  <SelectItem key={host.id} value={host.id}>
+                    {host.full_name}
+                    {host.email ? ` (${host.email})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </section>
+        )}
+
         {/* Basic Information */}
         <div className="rounded-2xl border border-border bg-card p-6 space-y-4 shadow-sm">
           <div className="flex items-center gap-2 border-b border-border pb-3">
@@ -980,7 +1037,7 @@ export function ListingForm({
         {/* Submit Actions */}
         <div className="flex justify-end gap-3 pt-4">
           <Link
-            href="/host/listings"
+            href={listingsPath}
             className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-5 text-xs font-semibold shadow-sm transition-colors hover:bg-muted"
           >
             Cancel

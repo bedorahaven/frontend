@@ -231,6 +231,96 @@ export async function listHostProperties() {
   });
 }
 
+export async function listAllPropertiesForAdmin() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    throw new Error('You must be signed in to manage listings.');
+  }
+
+  const { data: currentProfile, error: currentProfileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (currentProfileError || currentProfile?.role !== 'admin') {
+    throw new Error('You do not have permission to manage all listings.');
+  }
+
+  const { data: properties, error: propertyError } = await supabase
+    .from('properties')
+    .select('*, property_media (media_url, media_type)')
+    .order('created_at', { ascending: false });
+
+  if (propertyError) {
+    console.error('Admin properties fetch error:', propertyError.message);
+    throw new Error('Unable to load all listings.');
+  }
+
+  const hostIds = [...new Set((properties ?? []).map((property) => property.host_id))];
+  const { data: hosts, error: hostError } =
+    hostIds.length > 0
+      ? await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', hostIds)
+      : { data: [], error: null };
+
+  if (hostError) {
+    console.error('Admin listing host lookup error:', hostError.message);
+    throw new Error('Unable to load listing owners.');
+  }
+
+  const hostsById = new Map((hosts ?? []).map((host) => [host.id, host]));
+
+  return (properties ?? []).map((property) => ({
+    ...property,
+    media_url: property.property_media?.[0]?.media_url || '/bedora_icon.png',
+    category: property.category || 'trending',
+    host_profile: hostsById.get(property.host_id) ?? null,
+  }));
+}
+
+export async function listHostAccountsForAdmin() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    throw new Error('You must be signed in to manage listings.');
+  }
+
+  const { data: currentProfile, error: currentProfileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (currentProfileError || currentProfile?.role !== 'admin') {
+    throw new Error('You do not have permission to manage hosts.');
+  }
+
+  const { data: hosts, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, email')
+    .eq('role', 'host')
+    .order('full_name');
+
+  if (error) {
+    console.error('Admin host list fetch error:', error.message);
+    throw new Error('Unable to load host accounts.');
+  }
+
+  return hosts ?? [];
+}
+
 export async function getPropertyById(id: string) {
   try {
     const supabase = await createClient();
@@ -284,7 +374,8 @@ export async function getPropertyById(id: string) {
 }
 export async function createProperty(
   propertyData: Omit<PropertyInsertInput, 'host_id'>, // Omit host_id from client input
-  mediaData: Omit<PropertyMediaInsertInput, 'property_id'>[]
+  mediaData: Omit<PropertyMediaInsertInput, 'property_id'>[],
+  ownerHostId?: string,
 ) {
   try {
     const propertyValidationError = getPropertyValidationError(propertyData);
@@ -309,12 +400,37 @@ export async function createProperty(
       return { success: false, error: 'Unauthorized. Please log in again.' };
     }
 
-    // 2. Insert property record, explicitly binding host_id to user.id
+    let propertyHostId = user.id;
+    if (ownerHostId) {
+      const { data: currentProfile, error: currentProfileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (currentProfileError || currentProfile?.role !== 'admin') {
+        return { success: false, error: 'Only an admin can assign a listing to a host.' };
+      }
+
+      const { data: hostProfile, error: hostProfileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', ownerHostId)
+        .eq('role', 'host')
+        .maybeSingle();
+
+      if (hostProfileError || !hostProfile) {
+        return { success: false, error: 'Select a valid host for this listing.' };
+      }
+      propertyHostId = hostProfile.id;
+    }
+
+    // Keep ownership server-assigned; only admins may choose an existing host.
     const { data: newProperty, error: propertyError } = await supabase
       .from('properties')
       .insert({
         ...propertyData,
-        host_id: user.id, // <-- Enforces correct secure host_id
+        host_id: propertyHostId,
       })
       .select()
       .single();
@@ -341,7 +457,7 @@ export async function createProperty(
         .from('properties')
         .delete()
         .eq('id', newProperty.id)
-        .eq('host_id', user.id);
+        .eq('host_id', propertyHostId);
       if (cleanupError) {
         console.error('Unable to clean up property after media insertion failure:', cleanupError.message);
       }
@@ -384,10 +500,42 @@ export async function getHostPropertyForEdit(id: string) {
   }
 }
 
+export async function getAdminPropertyForEdit(id: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) return null;
+
+  const { data: currentProfile, error: currentProfileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (currentProfileError || currentProfile?.role !== 'admin') return null;
+
+  const { data, error } = await supabase
+    .from('properties')
+    .select('*, property_media(*)')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Admin property fetch error:', error.message);
+    return null;
+  }
+
+  return data;
+}
+
 export async function updateProperty(
   id: string,
   propertyData: Omit<PropertyInsertInput, 'host_id'>,
-  mediaData: PropertyMediaInput[]
+  mediaData: PropertyMediaInput[],
+  ownerHostId?: string,
 ) {
   try {
     const propertyValidationError = getPropertyValidationError(propertyData);
@@ -405,12 +553,39 @@ export async function updateProperty(
       return { success: false, error: 'Unauthorized. Please log in again.' };
     }
 
-    const { data: property, error: ownershipError } = await supabase
+    const { data: currentProfile, error: currentProfileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (currentProfileError) {
+      console.error('Property editor role lookup failed:', currentProfileError.message);
+      return { success: false, error: 'Unable to verify listing permissions.' };
+    }
+    const isAdmin = currentProfile?.role === 'admin';
+    if (isAdmin && !ownerHostId) {
+      return { success: false, error: 'Select a host for this listing.' };
+    }
+    if (isAdmin && ownerHostId) {
+      const { data: hostProfile, error: hostProfileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', ownerHostId)
+        .eq('role', 'host')
+        .maybeSingle();
+
+      if (hostProfileError || !hostProfile) {
+        return { success: false, error: 'Select a valid host for this listing.' };
+      }
+    }
+
+    let propertyQuery = supabase
       .from('properties')
       .select('id')
-      .eq('id', id)
-      .eq('host_id', user.id)
-      .maybeSingle();
+      .eq('id', id);
+    if (!isAdmin) propertyQuery = propertyQuery.eq('host_id', user.id);
+    const { data: property, error: ownershipError } = await propertyQuery.maybeSingle();
 
     if (ownershipError || !property) {
       if (ownershipError) console.error('Property ownership check failed:', ownershipError.message);
@@ -444,7 +619,7 @@ export async function updateProperty(
       return { success: false, error: mediaValidationError };
     }
 
-    const updateData: Omit<PropertyInsertInput, 'host_id'> = {
+    const updateData: Omit<PropertyInsertInput, 'host_id'> & { host_id?: string } = {
       title: propertyData.title,
       description: propertyData.description,
       category: propertyData.category,
@@ -463,6 +638,7 @@ export async function updateProperty(
       is_active: propertyData.is_active,
       google_maps_url: propertyData.google_maps_url,
     };
+    if (isAdmin && ownerHostId) updateData.host_id = ownerHostId;
     const newMedia = mediaData
       .filter((media) => !media.id)
       .map((media, index) => ({
@@ -487,11 +663,12 @@ export async function updateProperty(
       insertedMediaIds = insertedMedia?.map((media) => media.id) ?? [];
     }
 
-    const { data: updatedProperty, error: propertyError } = await supabase
+    let updateQuery = supabase
       .from('properties')
       .update(updateData)
-      .eq('id', id)
-      .eq('host_id', user.id)
+      .eq('id', id);
+    if (!isAdmin) updateQuery = updateQuery.eq('host_id', user.id);
+    const { data: updatedProperty, error: propertyError } = await updateQuery
       .select('id')
       .maybeSingle();
 
@@ -527,6 +704,7 @@ export async function updateProperty(
 
     revalidatePath('/host');
     revalidatePath('/host/listings');
+    revalidatePath('/admin/listings');
     revalidatePath(`/host/listings/${id}/edit`);
     revalidatePath(`/properties/${id}`);
     return { success: true, propertyId: id };
@@ -539,7 +717,7 @@ export async function updateProperty(
   }
 }
 
-export async function deleteProperty(id: string) {
+export async function deleteProperty(id: string, adminMode = false) {
   try {
     const supabase = await createClient();
     const {
@@ -551,23 +729,36 @@ export async function deleteProperty(id: string) {
       return { success: false, error: 'Unauthorized. Please log in again.' };
     }
 
-    const { data: property, error: ownershipError } = await supabase
+    if (adminMode) {
+      const { data: currentProfile, error: currentProfileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (currentProfileError || currentProfile?.role !== 'admin') {
+        return { success: false, error: 'Only admins can delete any listing.' };
+      }
+    }
+
+    let propertyQuery = supabase
       .from('properties')
       .select('id')
-      .eq('id', id)
-      .eq('host_id', user.id)
-      .maybeSingle();
+      .eq('id', id);
+    if (!adminMode) propertyQuery = propertyQuery.eq('host_id', user.id);
+    const { data: property, error: ownershipError } = await propertyQuery.maybeSingle();
 
     if (ownershipError || !property) {
       if (ownershipError) console.error('Property ownership check failed:', ownershipError.message);
       return { success: false, error: 'Property not found or you do not have permission to delete it.' };
     }
 
-    const { data: deletedProperty, error: propertyError } = await supabase
+    let deleteQuery = supabase
       .from('properties')
       .delete()
-      .eq('id', id)
-      .eq('host_id', user.id)
+      .eq('id', id);
+    if (!adminMode) deleteQuery = deleteQuery.eq('host_id', user.id);
+    const { data: deletedProperty, error: propertyError } = await deleteQuery
       .select('id')
       .maybeSingle();
 
@@ -587,6 +778,7 @@ export async function deleteProperty(id: string) {
 
     revalidatePath('/host');
     revalidatePath('/host/listings');
+    revalidatePath('/admin/listings');
     revalidatePath(`/properties/${id}`);
     return {
       success: true,
