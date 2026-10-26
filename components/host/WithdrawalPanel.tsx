@@ -42,9 +42,7 @@ export function WithdrawalPanel({
   const [bankError, setBankError] = useState<string | null>(null);
   const [selectedMethodId, setSelectedMethodId] = useState("");
   const [amount, setAmount] = useState("");
-  const [bankName, setBankName] = useState("");
   const [bankCode, setBankCode] = useState("");
-  const [accountName, setAccountName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [showMethodForm, setShowMethodForm] = useState(payoutMethods.length === 0);
@@ -117,9 +115,7 @@ export function WithdrawalPanel({
       try {
         result = await savePayoutMethod({
           methodType,
-          bankName: methodType === "bank" ? bankName : undefined,
           bankCode: methodType === "bank" ? bankCode : undefined,
-          accountName: methodType === "bank" ? accountName : undefined,
           accountNumber: methodType === "bank" ? accountNumber : undefined,
           phoneNumber: methodType === "mpesa" ? phoneNumber : undefined,
         });
@@ -136,9 +132,7 @@ export function WithdrawalPanel({
 
       toast.success("Payout method saved.");
       setShowMethodForm(false);
-      setBankName("");
       setBankCode("");
-      setAccountName("");
       setAccountNumber("");
       setPhoneNumber("");
       router.refresh();
@@ -295,13 +289,14 @@ export function WithdrawalPanel({
                     <Select
                       value={bankCode}
                       onValueChange={(value) => {
-                        const bank = banks.find((item) => item.code === value);
                         setBankCode(value ?? "");
-                        setBankName(bank?.name ?? "");
                       }}
                     >
                       <SelectTrigger className="h-10 w-full text-sm">
-                        <SelectValue placeholder="Select bank" />
+                        <SelectValue>
+                          {banks.find((bank) => bank.code === bankCode)?.name ||
+                            "Select bank"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {banks.map((bank) => (
@@ -318,17 +313,6 @@ export function WithdrawalPanel({
                     )}
                   </label>
                   <label className="block space-y-1.5">
-                    <span className="text-xs font-medium text-foreground">Account holder name</span>
-                    <Input
-                      required
-                      autoComplete="name"
-                      maxLength={100}
-                      value={accountName}
-                      onChange={(event) => setAccountName(event.target.value)}
-                      className="h-10"
-                    />
-                  </label>
-                  <label className="block space-y-1.5">
                     <span className="text-xs font-medium text-foreground">Account number</span>
                     <Input
                       required
@@ -339,6 +323,10 @@ export function WithdrawalPanel({
                       onChange={(event) => setAccountNumber(event.target.value)}
                       className="h-10"
                     />
+                    <span className="block text-[11px] text-muted-foreground">
+                      We verify the account with Paystack and save the account
+                      name returned by the bank.
+                    </span>
                   </label>
                 </>
               ) : (

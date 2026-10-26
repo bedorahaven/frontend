@@ -22,6 +22,15 @@ export interface AdminWithdrawalRequest extends WithdrawalRequest {
   } | null;
 }
 
+interface PaystackBank {
+  name: string;
+  code: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 export async function getHostWithdrawalData(): Promise<HostWithdrawalData> {
   const supabase = await createClient();
   const user = await requireRole(supabase, "host");
@@ -49,9 +58,7 @@ export async function getHostWithdrawalData(): Promise<HostWithdrawalData> {
 
 export async function savePayoutMethod(input: {
   methodType: PayoutMethodType;
-  bankName?: string;
   bankCode?: string;
-  accountName?: string;
   accountNumber?: string;
   phoneNumber?: string;
 }): Promise<{ success: true } | { success: false; error: string }> {
@@ -74,10 +81,7 @@ export async function savePayoutMethod(input: {
     return { success: false, error: "Choose a supported payout method." };
   }
 
-  const bankName = typeof input.bankName === "string" ? input.bankName.trim() : "";
   const bankCode = typeof input.bankCode === "string" ? input.bankCode.trim() : "";
-  const accountName =
-    typeof input.accountName === "string" ? input.accountName.trim() : "";
   const accountNumber =
     typeof input.accountNumber === "string"
       ? input.accountNumber.replace(/\s+/g, "")
@@ -89,10 +93,7 @@ export async function savePayoutMethod(input: {
 
   if (
     input.methodType === "bank" &&
-    (!bankName ||
-      !/^[A-Za-z0-9_-]{1,24}$/.test(bankCode) ||
-      accountName.length < 2 ||
-      accountName.length > 100 ||
+    (!/^[A-Za-z0-9_-]{1,24}$/.test(bankCode) ||
       !/^[A-Za-z0-9-]{4,34}$/.test(accountNumber))
   ) {
     return { success: false, error: "Enter valid bank and account details." };
@@ -103,6 +104,137 @@ export async function savePayoutMethod(input: {
       error: "Enter a valid Kenyan M-Pesa number, for example 0712345678.",
     };
   }
+
+  let bankName: string | null = null;
+  let accountName: string | null = null;
+  if (input.methodType === "bank") {
+    const secretKey = process.env.PAYSTACK_SECRET_KEY;
+    if (!secretKey) {
+      console.error(
+        "Paystack payout account verification failed: PAYSTACK_SECRET_KEY is not configured.",
+      );
+      return {
+        success: false,
+        error: "Bank account verification is temporarily unavailable.",
+      };
+    }
+
+    let bankResponse: Response;
+    try {
+      bankResponse = await fetch(
+        "https://api.paystack.co/bank?country=kenya&perPage=100",
+        {
+          headers: { Authorization: `Bearer ${secretKey}` },
+          next: { revalidate: 86_400 },
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+    } catch (error) {
+      console.error("Paystack bank directory request failed:", error);
+      return {
+        success: false,
+        error: "Unable to verify the bank right now. Please try again.",
+      };
+    }
+
+    let bankBody: unknown;
+    try {
+      bankBody = await bankResponse.json();
+    } catch {
+      console.error("Paystack bank directory returned invalid JSON.");
+      return {
+        success: false,
+        error: "The bank directory returned an invalid response.",
+      };
+    }
+
+    const bankData =
+      isRecord(bankBody) && Array.isArray(bankBody.data)
+        ? bankBody.data
+        : [];
+    const selectedBank = bankData.find(
+      (bank): bank is PaystackBank =>
+        isRecord(bank) &&
+        typeof bank.name === "string" &&
+        typeof bank.code === "string" &&
+        bank.code === bankCode,
+    );
+
+    if (!bankResponse.ok || !isRecord(bankBody) || bankBody.status !== true) {
+      const providerMessage =
+        isRecord(bankBody) && typeof bankBody.message === "string"
+          ? bankBody.message
+          : "Invalid response.";
+      console.error("Paystack bank directory lookup failed:", providerMessage);
+      return {
+        success: false,
+        error: "Unable to verify the selected bank. Please try again.",
+      };
+    }
+    if (!selectedBank) {
+      return {
+        success: false,
+        error: "Select a valid Kenyan bank from the list.",
+      };
+    }
+
+    const resolveUrl = new URL("https://api.paystack.co/bank/resolve");
+    resolveUrl.searchParams.set("account_number", accountNumber);
+    resolveUrl.searchParams.set("bank_code", bankCode);
+
+    let resolveResponse: Response;
+    try {
+      resolveResponse = await fetch(resolveUrl, {
+        headers: { Authorization: `Bearer ${secretKey}` },
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (error) {
+      console.error("Paystack payout account resolution request failed:", error);
+      return {
+        success: false,
+        error: "Unable to verify this account right now. Please try again.",
+      };
+    }
+
+    let resolveBody: unknown;
+    try {
+      resolveBody = await resolveResponse.json();
+    } catch {
+      console.error("Paystack account resolution returned invalid JSON.");
+      return {
+        success: false,
+        error: "Account verification returned an invalid response.",
+      };
+    }
+
+    const resolvedData =
+      isRecord(resolveBody) && isRecord(resolveBody.data)
+        ? resolveBody.data
+        : null;
+    if (
+      !resolveResponse.ok ||
+      !isRecord(resolveBody) ||
+      resolveBody.status !== true ||
+      !resolvedData ||
+      typeof resolvedData.account_name !== "string" ||
+      resolvedData.account_name.trim().length < 2
+    ) {
+      const providerMessage =
+        isRecord(resolveBody) && typeof resolveBody.message === "string"
+          ? resolveBody.message
+          : "Invalid response.";
+      console.error("Paystack account resolution failed:", providerMessage);
+      return {
+        success: false,
+        error:
+          "Account number could not be verified for this bank. Check the details and try again.",
+      };
+    }
+
+    bankName = selectedBank.name;
+    accountName = resolvedData.account_name.trim().slice(0, 100);
+  }
+
   const { error } = await supabase.from("payout_methods").insert({
     host_id: user.id,
     method_type: input.methodType,
@@ -118,7 +250,7 @@ export async function savePayoutMethod(input: {
     return { success: false, error: "Unable to save payout method." };
   }
 
-  revalidatePath("/host/earnings");
+  revalidatePath("/host/withdrawals");
   return { success: true };
 }
 
@@ -192,8 +324,8 @@ export async function requestWithdrawal(
     };
   }
 
-  revalidatePath("/host/earnings");
-  revalidatePath("/admin/earnings");
+  revalidatePath("/host/withdrawals");
+  revalidatePath("/admin/withdrawals");
 
   let notificationWarning: string | undefined;
   try {
