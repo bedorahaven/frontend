@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type { UserRole } from "@/types/profile";
+import { formatJoinedDate } from "@/lib/utils";
 
 export interface AdminUser {
   id: string;
@@ -178,9 +179,11 @@ export function UsersTable({ users }: UsersTableProps) {
                   </span>
                   <time
                     dateTime={user.created_at}
+                    title={new Date(user.created_at).toLocaleString()}
+                    suppressHydrationWarning
                     className="text-muted-foreground"
                   >
-                    Joined {new Date(user.created_at).toLocaleDateString()}
+                    Joined {formatJoinedDate(user.created_at)}
                   </time>
                 </div>
               </article>
@@ -221,3 +224,4 @@ export function UsersTable({ users }: UsersTableProps) {
     </section>
   );
 }
+

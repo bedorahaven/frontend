@@ -45,10 +45,7 @@ async function AdminUsersContent({ searchParams }: AdminUsersPageProps) {
   return (
     <div className="space-y-6 p-4 md:p-8">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
-            Admin workspace
-          </p>
+        <div> 
           <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             <Users className="size-6" aria-hidden="true" />
             Manage users

@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { HostEarningsTransaction } from "@/types/host-earnings";
+import { formatAmount, formatDate, formatJoinedDate, formatStatus } from "@/lib/utils";
 
 const PAGE_SIZE = 8;
 type DateFilter = "all" | "30" | "90";
@@ -337,7 +338,7 @@ function TransactionIdentity({
         {transaction.mpesa_receipt_number || `#${transaction.id.slice(0, 8)}`}
       </p>
       <p className="mt-1 text-[11px] text-muted-foreground">
-        {formatDateTime(transaction.created_at)}
+        {formatJoinedDate(transaction.created_at)}
       </p>
     </div>
   );
@@ -407,42 +408,4 @@ function TransactionStatus({ status }: { status: string }) {
       {formatStatus(normalized)}
     </span>
   );
-}
-
-function formatAmount(amount: number, currency: string): string {
-  const numericAmount = Number(amount);
-  if (!Number.isFinite(numericAmount)) return "—";
-  return new Intl.NumberFormat("en-KE", {
-    style: "currency",
-    currency: currency || "KSh",
-    maximumFractionDigits: 0,
-  }).format(numericAmount);
-}
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Date unavailable";
-  return new Intl.DateTimeFormat("en-KE", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function formatDate(value: string): string {
-  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return "Date unavailable";
-  return new Intl.DateTimeFormat("en-KE", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
-function formatStatus(status: string): string {
-  return status
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
