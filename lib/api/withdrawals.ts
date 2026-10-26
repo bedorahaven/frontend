@@ -156,6 +156,8 @@ export async function savePayoutMethod(input: {
 
     let resolvedAccountName: string | null = null;
     let resolvedBankCode: string | null = null;
+    let lastResolutionMessage: string | null = null;
+    let lastResolutionReturnedNoName = false;
     for (const candidateCode of selectedBank.codes) {
       const resolveUrl = new URL("https://api.paystack.co/bank/resolve");
       resolveUrl.searchParams.set("account_number", accountNumber);
@@ -190,6 +192,9 @@ export async function savePayoutMethod(input: {
         isRecord(resolveBody) && isRecord(resolveBody.data)
           ? resolveBody.data
           : null;
+      if (isRecord(resolveBody) && typeof resolveBody.message === "string") {
+        lastResolutionMessage = resolveBody.message;
+      }
       if (
         resolveResponse.ok &&
         isRecord(resolveBody) &&
@@ -202,13 +207,23 @@ export async function savePayoutMethod(input: {
         resolvedBankCode = candidateCode;
         break;
       }
+      lastResolutionReturnedNoName ||= Boolean(
+        resolveResponse.ok &&
+          isRecord(resolveBody) &&
+          resolveBody.status === true &&
+          candidateData,
+      );
     }
 
     if (!resolvedAccountName || !resolvedBankCode) {
+      const detail = lastResolutionReturnedNoName
+        ? "Paystack accepted the request but did not return an account-holder name."
+        : lastResolutionMessage
+          ? `Paystack says: ${lastResolutionMessage.replace(/[\r\n]/g, " ").slice(0, 180)}`
+          : "Paystack could not resolve this bank and account-number combination.";
       return {
         success: false,
-        error:
-          "Account number could not be verified for this bank. Check the details and try again.",
+        error: `${detail} The bank may be listed by Paystack but not support account resolution for this account type. Contact support or choose another payout method.`,
       };
     }
 
