@@ -55,11 +55,13 @@ function HeaderContent() {
   const supabase = createClient();
 
   // Fetch logged-in user and profile on mount
-// Fetch logged-in user and profile on mount
+  // Fetch logged-in user and profile on mount
   useEffect(() => {
     async function getUserData() {
       // 1. Instantly read local session from cookies/storage
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const currentUser = session?.user ?? null;
       setUser(currentUser);
 
@@ -458,6 +460,15 @@ function HeaderContent() {
                         <span>Become a host</span>
                       </Link>
                     )}
+
+                    <Link
+                      href="/lookup"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-muted transition-colors"
+                    >
+                      <CalendarCheck className="w-4 h-4 text-muted-foreground" />
+                      <span>Lookup Booking</span>
+                    </Link>
                     <Link
                       href="/help"
                       onClick={() => setIsMenuOpen(false)}
@@ -713,7 +724,11 @@ function HeaderContent() {
 
 export function Header() {
   return (
-    <Suspense fallback={<div className="h-20 w-full bg-background border-b border-border" />}>
+    <Suspense
+      fallback={
+        <div className="h-20 w-full bg-background border-b border-border" />
+      }
+    >
       <HeaderContent />
     </Suspense>
   );
