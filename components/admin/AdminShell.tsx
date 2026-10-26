@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Building2,
+  ArrowDownToLine,
   CalendarDays,
   CircleHelp,
   Home,
@@ -23,6 +24,7 @@ const navigationItems = [
   { href: "/admin/reviews", label: "Guest Reviews", icon: Star },
   { href: "/admin/reservations", label: "Reservations", icon: CalendarDays },
   { href: "/admin/earnings", label: "Earnings", icon: Wallet },
+  { href: "/admin/withdrawals", label: "Withdrawals", icon: ArrowDownToLine },
   { href: "/admin/messages", label: "Guest Messages", icon: MessageSquare },
   { href: "/admin/help", label: "Help Center", icon: CircleHelp },
 ];

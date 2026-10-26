@@ -2,13 +2,8 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { EarningsOverview } from "@/components/host/EarningsOverview";
-import { WithdrawalPanel } from "@/components/host/WithdrawalPanel";
 import { getHostEarnings } from "@/lib/api/transactions";
 import type { HostEarningsData } from "@/lib/api/transactions";
-import {
-  getHostWithdrawalData,
-  type HostWithdrawalData,
-} from "@/lib/api/withdrawals";
 
 export default function HostEarningsPage() {
   return (
@@ -25,12 +20,8 @@ async function EarningsContent() {
   await connection();
 
   let earnings: HostEarningsData;
-  let withdrawalData: HostWithdrawalData;
   try {
-    [earnings, withdrawalData] = await Promise.all([
-      getHostEarnings(),
-      getHostWithdrawalData(),
-    ]);
+    earnings = await getHostEarnings();
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unable to load earnings.";
@@ -49,27 +40,7 @@ async function EarningsContent() {
     );
   }
 
-  const completedEarnings = earnings.transactions
-    .filter(
-      (transaction) =>
-        transaction.status === "completed" && transaction.currency === "KES",
-    )
-    .reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
-  const reservedWithdrawals = withdrawalData.requests
-    .filter((request) => ["pending", "completed"].includes(request.status))
-    .reduce((total, request) => total + Number(request.amount || 0), 0);
-  const availableBalance = Math.max(0, completedEarnings - reservedWithdrawals);
-
-  return (
-    <div className="space-y-7">
-      <EarningsOverview earnings={earnings} />
-      <WithdrawalPanel
-        availableBalance={availableBalance}
-        payoutMethods={withdrawalData.payoutMethods}
-        requests={withdrawalData.requests}
-      />
-    </div>
-  );
+  return <EarningsOverview earnings={earnings} />;
 }
 
 function EarningsLoading() {
@@ -83,7 +54,6 @@ function EarningsLoading() {
           />
         ))}
       </div>
-      <div className="h-80 rounded-2xl border border-border bg-muted" />
     </div>
   );
 }
