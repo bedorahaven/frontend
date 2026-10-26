@@ -7,14 +7,9 @@ import {
   MessageCircle,
   Send,
   ShieldCheck,
+  X,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 
 interface PropertyChatWidgetProps {
   propertyId: string;
@@ -89,40 +84,48 @@ export function PropertyChatWidget({
   };
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => handleOpenChange(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted/50"
+    <DialogPrimitive.Root
+      open={isOpen}
+      onOpenChange={handleOpenChange}
+      modal={false}
+    >
+      <DialogPrimitive.Trigger
+        className="fixed bottom-4 right-4 z-[60] flex h-14 max-w-[calc(100vw-2rem)] items-center gap-2.5 rounded-full bg-primary px-5 text-sm font-bold text-white shadow-xl shadow-primary/25 transition hover:-translate-y-0.5 hover:shadow-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30"
+        aria-label={`Chat with ${hostName}`}
       >
-        <MessageCircle className="h-4 w-4 text-primary" />
-        <span className="min-w-0 truncate">Message {hostName}</span>
-        <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+        <MessageCircle className="h-5 w-5 shrink-0" />
+        <span className="truncate">Chat with {hostName}</span>
+        <span className="shrink-0 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
           Optional
         </span>
-      </button>
+      </DialogPrimitive.Trigger>
 
-      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent
-          className="max-h-[min(760px,calc(100dvh-2rem))] max-w-[calc(100%-2rem)] gap-0 overflow-y-auto rounded-3xl border border-border bg-card p-0 shadow-2xl sm:max-w-lg"
-          showCloseButton
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Popup
+          className="fixed inset-x-3 bottom-[5.5rem] z-[70] flex max-h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-3xl border border-border bg-card text-sm text-card-foreground shadow-2xl outline-none data-open:animate-in data-open:slide-in-from-bottom-3 data-closed:animate-out data-closed:fade-out-0 sm:inset-x-auto sm:right-6 sm:bottom-24 sm:w-[min(24rem,calc(100vw-3rem))] sm:max-h-[min(42rem,calc(100dvh-7rem))]"
         >
-          <div className="bg-gradient-to-br from-primary to-accent px-6 py-7 pr-14 text-white">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
-              <MessageCircle className="h-6 w-6" />
+          <div className="flex shrink-0 items-center gap-3 bg-gradient-to-br from-primary to-accent px-5 py-4 pr-14 text-white">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20">
+              <MessageCircle className="h-5 w-5" />
             </div>
-            <DialogHeader className="gap-2 text-left">
-              <DialogTitle className="text-xl font-bold text-white">
+            <div className="min-w-0 flex-1">
+              <DialogPrimitive.Title className="truncate text-base font-bold">
                 Chat with {hostName}
-              </DialogTitle>
-              <DialogDescription className="line-clamp-2 text-sm text-white/80">
-                Ask a question about {propertyName} before you book.
-              </DialogDescription>
-            </DialogHeader>
+              </DialogPrimitive.Title>
+              <DialogPrimitive.Description className="truncate text-xs text-white/80">
+                About {propertyName}
+              </DialogPrimitive.Description>
+            </div>
+            <DialogPrimitive.Close
+              aria-label="Close chat"
+              className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full text-white/90 transition hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <X className="h-4 w-4" />
+            </DialogPrimitive.Close>
           </div>
 
           {isSent ? (
-            <div className="space-y-4 px-6 py-8 text-center">
+            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-7 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
                 <CheckCircle2 className="h-7 w-7" />
               </div>
@@ -136,28 +139,27 @@ export function PropertyChatWidget({
                   . The host can reply directly to your email.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleOpenChange(false)}
-                className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              >
+              <DialogPrimitive.Close className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90">
                 Done
-              </button>
+              </DialogPrimitive.Close>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4 px-6 py-6">
-              <div className="rounded-2xl border border-border bg-muted/30 p-4">
-                <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-foreground">
+            <form
+              onSubmit={handleSubmit}
+              className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4"
+            >
+              <div className="rounded-2xl border border-border bg-muted/30 p-3.5">
+                <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground">
                   <ShieldCheck className="h-4 w-4 text-emerald-600" />
                   Your booking is not affected
                 </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Send a note to the host, or close this window and continue
-                  straight to payment.
+                  Send a note to the host, or close chat and continue straight
+                  to payment.
                 </p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="space-y-1.5 text-xs font-semibold text-foreground">
                   Your name{" "}
                   <span className="font-normal text-muted-foreground">
@@ -168,7 +170,7 @@ export function PropertyChatWidget({
                     maxLength={100}
                     value={guestName}
                     onChange={(event) => setGuestName(event.target.value)}
-                    placeholder="How should the host address you?"
+                    placeholder="Your name"
                     className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-normal outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
                   />
                 </label>
@@ -193,7 +195,7 @@ export function PropertyChatWidget({
                   required
                   minLength={1}
                   maxLength={2000}
-                  rows={5}
+                  rows={4}
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   placeholder="Ask about the space, check-in, or anything else..."
@@ -230,14 +232,14 @@ export function PropertyChatWidget({
                   </>
                 )}
               </button>
-              <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+              <p className="pb-1 text-center text-[11px] leading-relaxed text-muted-foreground">
                 We&apos;ll email the host and send a copy to you. Replies go
                 straight to your inbox.
               </p>
             </form>
           )}
-        </DialogContent>
-      </Dialog>
-    </>
+        </DialogPrimitive.Popup>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

@@ -1,7 +1,6 @@
 import "server-only";
 
 import { sendPropertyInquiryEmails } from "@/lib/email";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -25,19 +24,8 @@ type PropertyInquiryResult =
 export async function createPropertyInquiry(
   input: PropertyInquiryInput,
 ): Promise<PropertyInquiryResult> {
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch (error) {
-    console.error("Property inquiry storage is not configured:", error);
-    return {
-      success: false,
-      status: 503,
-      error: "Messaging is temporarily unavailable. Please try again later.",
-    };
-  }
-
-  const { data: property, error: propertyError } = await admin
+  const supabase = await createClient();
+  const { data: property, error: propertyError } = await supabase
     .from("properties")
     .select("id, title, host_id")
     .eq("id", input.propertyId)
@@ -59,7 +47,7 @@ export async function createPropertyInquiry(
     };
   }
 
-  const { data: host, error: hostError } = await admin
+  const { data: host, error: hostError } = await supabase
     .from("profiles")
     .select("id, email, full_name")
     .eq("id", property.host_id)
@@ -81,89 +69,25 @@ export async function createPropertyInquiry(
     };
   }
 
-  const session = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await session.auth.getUser();
+  const { error: inquiryError } = await supabase.rpc(
+    "create_property_inquiry",
+    {
+      p_property_id: property.id,
+      p_guest_email: input.guestEmail,
+      p_guest_name: input.guestName,
+      p_content: input.content,
+    },
+  );
 
-  if (userError) {
-    console.error("Property inquiry guest lookup failed:", userError.message);
-    return {
-      success: false,
-      status: 503,
-      error: "Unable to submit your message right now.",
-    };
-  }
-
-  let guestId: string | null = null;
-  if (user) {
-    const { data: guestProfile, error: guestProfileError } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (guestProfileError) {
-      console.error(
-        "Property inquiry guest profile lookup failed:",
-        guestProfileError.message,
-      );
+  if (inquiryError) {
+    if (inquiryError.code === "P0002") {
       return {
         success: false,
-        status: 503,
-        error: "Unable to submit your message right now.",
+        status: 404,
+        error: "This property is no longer available.",
       };
     }
-    guestId = guestProfile?.id ?? null;
-  }
-
-  const { data: conversation, error: conversationError } = await admin
-    .from("conversations")
-    .insert({
-      property_id: property.id,
-      booking_id: null,
-      guest_id: guestId,
-      host_id: host.id,
-      guest_email: input.guestEmail,
-      guest_name: input.guestName,
-    })
-    .select("id")
-    .single();
-
-  if (conversationError || !conversation) {
-    console.error(
-      "Property inquiry conversation could not be saved:",
-      conversationError?.message ?? "No conversation was returned.",
-    );
-    return {
-      success: false,
-      status: 503,
-      error: "Your message could not be saved. Please try again.",
-    };
-  }
-
-  const { error: messageError } = await admin.from("messages").insert({
-    conversation_id: conversation.id,
-    sender_id: guestId,
-    content: input.content,
-  });
-
-  if (messageError) {
-    console.error(
-      "Property inquiry message could not be saved:",
-      messageError.message,
-    );
-    const { error: cleanupError } = await admin
-      .from("conversations")
-      .delete()
-      .eq("id", conversation.id);
-    if (cleanupError) {
-      console.error(
-        "Empty property inquiry conversation cleanup failed:",
-        cleanupError.message,
-      );
-    }
+    console.error("Property inquiry could not be saved:", inquiryError.message);
     return {
       success: false,
       status: 503,
