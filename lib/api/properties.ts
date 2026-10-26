@@ -1,8 +1,9 @@
 'use server';
 import { PropertyInsertInput, PropertyMediaInsertInput } from '@/types/properties';
 import type { MediaType } from '@/types/properties';
+import { revalidatePath } from 'next/cache';
+import { getBrowserImageUrl } from '@/lib/cloudinary';
 import { createClient } from '@/utils/supabase/server';
-  import { revalidatePath } from 'next/cache';
 
 const MIN_PROPERTY_IMAGES = 4;
 const MAX_PROPERTY_IMAGES = 8;
@@ -178,7 +179,9 @@ export async function listProperties() {
     if (!properties) return [];
 
     return properties.map(property => {
-      const primaryMedia = property.property_media?.[0]?.media_url || '/bedora_icon.png';
+      const primaryMedia = getBrowserImageUrl(
+        property.property_media?.[0]?.media_url || '/bedora_icon.png',
+      );
       return {
         ...property,
         media_url: primaryMedia,
@@ -222,7 +225,9 @@ export async function listHostProperties() {
   }
 
   return (properties ?? []).map(property => {
-    const primaryMedia = property.property_media?.[0]?.media_url || '/bedora_icon.png';
+    const primaryMedia = getBrowserImageUrl(
+      property.property_media?.[0]?.media_url || '/bedora_icon.png',
+    );
     return {
       ...property,
       media_url: primaryMedia,
@@ -290,7 +295,9 @@ export async function listAllPropertiesForAdmin(limit?: number) {
 
   return (properties ?? []).map((property) => ({
     ...property,
-    media_url: property.property_media?.[0]?.media_url || '/bedora_icon.png',
+    media_url: getBrowserImageUrl(
+      property.property_media?.[0]?.media_url || '/bedora_icon.png',
+    ),
     category: property.category || 'trending',
     host_profile: hostsById.get(property.host_id) ?? null,
   }));
@@ -366,8 +373,12 @@ export async function getPropertyById(id: string) {
       }
     }
 
-    const primaryMedia = property.property_media?.[0]?.media_url || '/bedora_icon.png';
-    const allMedia = property.property_media?.map((m: { media_url: string }) => m.media_url) || [primaryMedia];
+    const primaryMedia = getBrowserImageUrl(
+      property.property_media?.[0]?.media_url || '/bedora_icon.png',
+    );
+    const allMedia = property.property_media?.map(
+      (media: { media_url: string }) => getBrowserImageUrl(media.media_url),
+    ) || [primaryMedia];
 
     return {
       ...property,

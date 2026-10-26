@@ -2,6 +2,7 @@ import { getPropertyById } from "@/lib/api/properties";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import {
   MapPin,
@@ -59,6 +60,7 @@ async function PropertyDetailContent({
     );
   }
 
+  await connection();
   const property = await getPropertyById(id);
 
   if (!property) {
