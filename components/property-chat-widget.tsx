@@ -1,8 +1,15 @@
 "use client";
 
-import { FormEvent, useState } from "react";
 import {
-  CheckCircle2,
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
   Loader2,
   MessageCircle,
   Send,
@@ -18,6 +25,103 @@ interface PropertyChatWidgetProps {
   defaultEmail: string;
 }
 
+interface ChatMessage {
+  id: string;
+  content: string;
+  createdAt: string;
+}
+
+interface SavedChat {
+  conversationId: string | null;
+  accessToken: string;
+  guestName: string;
+  guestEmail: string;
+  messages: ChatMessage[];
+}
+
+const EMPTY_CHAT = "__bedorahaven_chat_empty__";
+const CHAT_STORAGE_EVENT = "bedorahaven:chat-storage";
+const EMPTY_MESSAGES: ChatMessage[] = [];
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isSavedChat(value: unknown): value is SavedChat {
+  if (typeof value !== "object" || value === null) return false;
+  const chat = value as Record<string, unknown>;
+  return (
+    (chat.conversationId === null ||
+      (typeof chat.conversationId === "string" &&
+        UUID_PATTERN.test(chat.conversationId))) &&
+    typeof chat.accessToken === "string" &&
+    UUID_PATTERN.test(chat.accessToken) &&
+    typeof chat.guestName === "string" &&
+    typeof chat.guestEmail === "string" &&
+    Array.isArray(chat.messages) &&
+    chat.messages.every(
+      (message: unknown) =>
+        typeof message === "object" &&
+        message !== null &&
+        "id" in message &&
+        typeof message.id === "string" &&
+        "content" in message &&
+        typeof message.content === "string" &&
+        "createdAt" in message &&
+        typeof message.createdAt === "string" &&
+        Number.isFinite(Date.parse(message.createdAt)),
+    )
+  );
+}
+
+function subscribeToChat(
+  storageKey: string,
+  onStoreChange: () => void,
+): () => void {
+  const handleStorageChange = (event: Event) => {
+    if (
+      !(event instanceof StorageEvent) ||
+      event.key === storageKey ||
+      event.key === null
+    ) {
+      onStoreChange();
+    }
+  };
+  window.addEventListener("storage", handleStorageChange);
+  window.addEventListener(CHAT_STORAGE_EVENT, handleStorageChange);
+  return () => {
+    window.removeEventListener("storage", handleStorageChange);
+    window.removeEventListener(CHAT_STORAGE_EVENT, handleStorageChange);
+  };
+}
+
+function getChatSnapshot(storageKey: string): string {
+  try {
+    return window.localStorage.getItem(storageKey) ?? EMPTY_CHAT;
+  } catch (error) {
+    console.error("Property chat could not be loaded from this device:", error);
+    return EMPTY_CHAT;
+  }
+}
+
+function parseSavedChat(snapshot: string): SavedChat | null {
+  if (snapshot === EMPTY_CHAT) return null;
+  try {
+    const parsed: unknown = JSON.parse(snapshot);
+    return isSavedChat(parsed) ? parsed : null;
+  } catch (error) {
+    console.error("Saved property chat has invalid data:", error);
+    return null;
+  }
+}
+
+function saveChat(storageKey: string, chat: SavedChat): void {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(chat));
+    window.dispatchEvent(new Event(CHAT_STORAGE_EVENT));
+  } catch (error) {
+    console.error("Property chat could not be saved on this device:", error);
+  }
+}
+
 export function PropertyChatWidget({
   propertyId,
   propertyName,
@@ -25,26 +129,74 @@ export function PropertyChatWidget({
   defaultEmail,
 }: PropertyChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [guestName, setGuestName] = useState("");
-  const [guestEmail, setGuestEmail] = useState(defaultEmail);
+  const [identity, setIdentity] = useState({
+    guestName: "",
+    guestEmail: defaultEmail,
+  });
   const [message, setMessage] = useState("");
+  const [transientChat, setTransientChat] = useState<SavedChat | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isSent, setIsSent] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const storageKey = `bedorahaven:chat:${propertyId}`;
+  const subscribe = useCallback(
+    (onStoreChange: () => void) =>
+      subscribeToChat(storageKey, onStoreChange),
+    [storageKey],
+  );
+  const getSnapshot = useCallback(
+    () => getChatSnapshot(storageKey),
+    [storageKey],
+  );
+  const getServerSnapshot = useCallback(() => null, []);
+  const chatSnapshot = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
+  const savedChat = useMemo(
+    () => (chatSnapshot ? parseSavedChat(chatSnapshot) : null),
+    [chatSnapshot],
+  );
+  const chat = savedChat ?? transientChat;
+  const conversationId = chat?.conversationId ?? null;
+  const accessToken = chat?.accessToken ?? null;
+  const guestName = chat?.guestName ?? identity.guestName;
+  const guestEmail = chat?.guestEmail ?? identity.guestEmail;
+  const messages = useMemo(
+    () => chat?.messages ?? EMPTY_MESSAGES,
+    [chat],
+  );
+  const isReady = chatSnapshot !== null;
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isOpen]);
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
-    if (open) {
-      setErrorMessage(null);
-      setIsSent(false);
-      setGuestEmail((currentEmail) => currentEmail || defaultEmail);
-    }
+    if (open) setErrorMessage(null);
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const content = message.trim();
+    if (!content || isSending) return;
+
     setErrorMessage(null);
     setIsSending(true);
+    const token = accessToken ?? crypto.randomUUID();
+    const draftChat: SavedChat = chat ?? {
+      conversationId: null,
+      accessToken: token,
+      guestName: guestName.trim(),
+      guestEmail: guestEmail.trim(),
+      messages: [],
+    };
+    if (!chat) {
+      setTransientChat(draftChat);
+      saveChat(storageKey, draftChat);
+    }
 
     try {
       const response = await fetch("/api/conversations", {
@@ -52,14 +204,23 @@ export function PropertyChatWidget({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           property_id: propertyId,
+          conversation_id: conversationId,
+          access_token: token,
           guest_name: guestName.trim(),
           guest_email: guestEmail.trim(),
-          content: message.trim(),
+          content,
         }),
       });
       const result: unknown = await response.json();
 
-      if (!response.ok) {
+      if (
+        !response.ok ||
+        typeof result !== "object" ||
+        result === null ||
+        !("conversation_id" in result) ||
+        typeof result.conversation_id !== "string" ||
+        !UUID_PATTERN.test(result.conversation_id)
+      ) {
         const responseError =
           typeof result === "object" &&
           result !== null &&
@@ -71,12 +232,30 @@ export function PropertyChatWidget({
         return;
       }
 
-      setIsSent(true);
+      const nextConversationId = result.conversation_id;
+      const nextMessages = [
+        ...messages,
+        {
+          id: crypto.randomUUID(),
+          content,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      const nextChat: SavedChat = {
+        conversationId: nextConversationId,
+        accessToken: token,
+        guestName: guestName.trim(),
+        guestEmail: guestEmail.trim(),
+        messages: nextMessages,
+      };
+
+      setTransientChat(nextChat);
+      saveChat(storageKey, nextChat);
       setMessage("");
     } catch (error) {
-      console.error("Property inquiry submission failed:", error);
+      console.error("Property chat message could not be sent:", error);
       setErrorMessage(
-        "We couldn't reach the host just now. Please try again in a moment.",
+        "Your message couldn't be sent. Check your connection and try again.",
       );
     } finally {
       setIsSending(false);
@@ -95,15 +274,10 @@ export function PropertyChatWidget({
       >
         <MessageCircle className="h-5 w-5 shrink-0" />
         <span className="truncate">Chat with {hostName}</span>
-        <span className="shrink-0 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-          Optional
-        </span>
       </DialogPrimitive.Trigger>
 
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Popup
-          className="fixed inset-x-3 bottom-[5.5rem] z-[70] flex max-h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-3xl border border-border bg-card text-sm text-card-foreground shadow-2xl outline-none data-open:animate-in data-open:slide-in-from-bottom-3 data-closed:animate-out data-closed:fade-out-0 sm:inset-x-auto sm:right-6 sm:bottom-24 sm:w-[min(24rem,calc(100vw-3rem))] sm:max-h-[min(42rem,calc(100dvh-7rem))]"
-        >
+        <DialogPrimitive.Popup className="fixed inset-x-3 bottom-[5.5rem] z-[70] flex max-h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-3xl border border-border bg-card text-sm text-card-foreground shadow-2xl outline-none data-open:animate-in data-open:slide-in-from-bottom-3 data-closed:animate-out data-closed:fade-out-0 sm:inset-x-auto sm:right-6 sm:bottom-24 sm:w-[min(24rem,calc(100vw-3rem))] sm:max-h-[min(42rem,calc(100dvh-7rem))]">
           <div className="flex shrink-0 items-center gap-3 bg-gradient-to-br from-primary to-accent px-5 py-4 pr-14 text-white">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20">
               <MessageCircle className="h-5 w-5" />
@@ -113,7 +287,7 @@ export function PropertyChatWidget({
                 Chat with {hostName}
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="truncate text-xs text-white/80">
-                About {propertyName}
+                {propertyName}
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close
@@ -124,120 +298,146 @@ export function PropertyChatWidget({
             </DialogPrimitive.Close>
           </div>
 
-          {isSent ? (
-            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-7 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
-                <CheckCircle2 className="h-7 w-7" />
+          <div
+            className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-muted/20 px-4 py-4"
+            aria-live="polite"
+            aria-label="Chat messages"
+          >
+            {!isReady ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold">Message sent</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  Your inquiry is with {hostName}. We sent a copy to{" "}
-                  <span className="font-medium text-foreground">
-                    {guestEmail}
-                  </span>
-                  . The host can reply directly to your email.
-                </p>
-              </div>
-              <DialogPrimitive.Close className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90">
-                Done
-              </DialogPrimitive.Close>
-            </div>
-          ) : (
-            <form
-              onSubmit={handleSubmit}
-              className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4"
-            >
-              <div className="rounded-2xl border border-border bg-muted/30 p-3.5">
-                <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  Your booking is not affected
+            ) : messages.length === 0 ? (
+              <div className="mx-auto max-w-[90%] space-y-3 py-4 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <MessageCircle className="h-6 w-6" />
                 </div>
+                <p className="text-sm font-semibold text-foreground">
+                  Ask {hostName} about this stay
+                </p>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Send a note to the host, or close chat and continue straight
-                  to payment.
+                  Start a conversation about {propertyName}. You can keep
+                  chatting here.
                 </p>
               </div>
+            ) : (
+              messages.map((chatMessage) => (
+                <div key={chatMessage.id} className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-sm text-white shadow-sm">
+                    <p className="whitespace-pre-wrap break-words">
+                      {chatMessage.content}
+                    </p>
+                    <time
+                      dateTime={chatMessage.createdAt}
+                      className="mt-1 block text-right text-[10px] text-white/70"
+                    >
+                      {new Intl.DateTimeFormat(undefined, {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      }).format(new Date(chatMessage.createdAt))}
+                    </time>
+                  </div>
+                </div>
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1.5 text-xs font-semibold text-foreground">
-                  Your name{" "}
-                  <span className="font-normal text-muted-foreground">
-                    (optional)
-                  </span>
+          <form
+            onSubmit={handleSubmit}
+            className="shrink-0 space-y-3 border-t border-border bg-card p-4"
+          >
+            {!conversationId && (
+              <>
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  Chat is optional. You can still continue to checkout.
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="sr-only" htmlFor={`guest-name-${propertyId}`}>
+                    Your name (optional)
+                  </label>
                   <input
+                    id={`guest-name-${propertyId}`}
                     autoComplete="name"
                     maxLength={100}
                     value={guestName}
-                    onChange={(event) => setGuestName(event.target.value)}
-                    placeholder="Your name"
-                    className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-normal outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+                    onChange={(event) =>
+                      setIdentity((current) => ({
+                        ...current,
+                        guestName: event.target.value,
+                      }))
+                    }
+                    placeholder="Name (optional)"
+                    className="h-10 min-w-0 rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
                   />
-                </label>
-                <label className="space-y-1.5 text-xs font-semibold text-foreground">
-                  Email address
+                  <label className="sr-only" htmlFor={`guest-email-${propertyId}`}>
+                    Your email
+                  </label>
                   <input
+                    id={`guest-email-${propertyId}`}
                     autoComplete="email"
                     type="email"
                     required
                     maxLength={254}
+                    readOnly={Boolean(accessToken)}
                     value={guestEmail}
-                    onChange={(event) => setGuestEmail(event.target.value)}
-                    placeholder="you@example.com"
-                    className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm font-normal outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+                    onChange={(event) =>
+                      setIdentity((current) => ({
+                        ...current,
+                        guestEmail: event.target.value,
+                      }))
+                    }
+                    placeholder="Email address"
+                    className="h-10 min-w-0 rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
                   />
-                </label>
-              </div>
+                </div>
+              </>
+            )}
 
-              <label className="block space-y-1.5 text-xs font-semibold text-foreground">
-                Your message
-                <textarea
-                  required
-                  minLength={1}
-                  maxLength={2000}
-                  rows={4}
-                  value={message}
-                  onChange={(event) => setMessage(event.target.value)}
-                  placeholder="Ask about the space, check-in, or anything else..."
-                  className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-normal leading-relaxed outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
-                />
-                <span className="block text-right font-normal text-muted-foreground">
-                  {message.length}/2000
-                </span>
-              </label>
-
-              {errorMessage && (
-                <p
-                  role="alert"
-                  className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-xs text-destructive"
-                >
-                  {errorMessage}
-                </p>
-              )}
-
+            <label className="sr-only" htmlFor={`chat-message-${propertyId}`}>
+              Message
+            </label>
+            <div className="flex items-end gap-2">
+              <textarea
+                id={`chat-message-${propertyId}`}
+                required
+                maxLength={2000}
+                rows={2}
+                value={message}
+                disabled={!isReady || isSending}
+                onChange={(event) => setMessage(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                placeholder="Write a message..."
+                className="min-h-11 max-h-32 min-w-0 flex-1 resize-y rounded-2xl border border-border bg-background px-3.5 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-60"
+              />
               <button
                 type="submit"
-                disabled={isSending}
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-white shadow-lg shadow-primary/15 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!isReady || isSending || !message.trim()}
+                aria-label="Send message"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Sending message…
-                  </>
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <>
-                    <Send className="h-4 w-4" />
-                    Send message
-                  </>
+                  <Send className="h-4 w-4" />
                 )}
               </button>
-              <p className="pb-1 text-center text-[11px] leading-relaxed text-muted-foreground">
-                We&apos;ll email the host and send a copy to you. Replies go
-                straight to your inbox.
+            </div>
+            {errorMessage && (
+              <p
+                role="alert"
+                className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+              >
+                {errorMessage}
               </p>
-            </form>
-          )}
+            )}
+          </form>
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

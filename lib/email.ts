@@ -190,7 +190,7 @@ export async function sendPayoutVerificationCode(params: {
   return data.id;
 }
 
-export async function sendPropertyInquiryEmails(params: {
+export async function sendPropertyChatMessageEmails(params: {
   hostEmail: string;
   hostName: string;
   guestEmail: string;
@@ -221,10 +221,10 @@ export async function sendPropertyInquiryEmails(params: {
     from,
     to: [params.hostEmail],
     replyTo: params.guestEmail,
-    subject: `New inquiry about ${safePropertyName}`,
+    subject: `New message about ${safePropertyName}`,
     html: `
       <div style="font-family: Arial, sans-serif; padding: 24px; color: #172033;">
-        <h2 style="margin: 0 0 8px;">A guest is interested in your property</h2>
+        <h2 style="margin: 0 0 8px;">New guest message</h2>
         <p style="color: #667085;">${guestName} sent you a message about <strong>${propertyName}</strong>.</p>
         <div style="margin: 20px 0; padding: 16px; border-radius: 12px; background: #f4f7fb; line-height: 1.6;">
           ${message}
@@ -249,7 +249,7 @@ export async function sendPropertyInquiryEmails(params: {
     html: `
       <div style="font-family: Arial, sans-serif; padding: 24px; color: #172033;">
         <h2 style="margin: 0 0 8px;">Your message has been sent</h2>
-        <p style="color: #667085;">We sent your inquiry about <strong>${propertyName}</strong> to ${hostName}.</p>
+        <p style="color: #667085;">Here’s a copy of your message to ${hostName} about <strong>${propertyName}</strong>.</p>
         <div style="margin: 20px 0; padding: 16px; border-radius: 12px; background: #f4f7fb; line-height: 1.6;">
           ${message}
         </div>

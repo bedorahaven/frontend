@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import { createPropertyInquiry } from "@/lib/api/conversations";
+import { after, NextResponse } from "next/server";
+import { sendPropertyChatMessageEmails } from "@/lib/email";
+import { sendPropertyChatMessage } from "@/lib/api/conversations";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const UUID_PATTERN =
@@ -31,6 +32,10 @@ export async function POST(request: Request) {
 
   const propertyId =
     typeof body.property_id === "string" ? body.property_id : "";
+  const conversationId =
+    typeof body.conversation_id === "string" ? body.conversation_id : null;
+  const accessToken =
+    typeof body.access_token === "string" ? body.access_token : "";
   const guestName =
     typeof body.guest_name === "string" ? body.guest_name.trim() : "";
   const guestEmail =
@@ -41,6 +46,8 @@ export async function POST(request: Request) {
 
   if (
     !UUID_PATTERN.test(propertyId) ||
+    (conversationId !== null && !UUID_PATTERN.test(conversationId)) ||
+    !UUID_PATTERN.test(accessToken) ||
     !EMAIL_PATTERN.test(guestEmail) ||
     guestEmail.length > 254 ||
     guestName.length > 100 ||
@@ -53,19 +60,29 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await createPropertyInquiry({
+  const result = await sendPropertyChatMessage({
     propertyId,
+    conversationId,
+    accessToken,
     guestName: guestName || null,
     guestEmail,
     content,
   });
 
   if (!result.success) {
-    return NextResponse.json(
-      { error: result.error, saved: result.saved },
-      { status: result.status },
-    );
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json({ success: true }, { status: 201 });
+  after(async () => {
+    try {
+      await sendPropertyChatMessageEmails(result.email);
+    } catch (error) {
+      console.error("Property chat email delivery failed:", error);
+    }
+  });
+
+  return NextResponse.json(
+    { conversation_id: result.conversationId },
+    { status: 200 },
+  );
 }

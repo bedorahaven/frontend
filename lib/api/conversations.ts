@@ -1,29 +1,34 @@
 import "server-only";
 
-import { sendPropertyInquiryEmails } from "@/lib/email";
+import type { sendPropertyChatMessageEmails } from "@/lib/email";
 import { createClient } from "@/utils/supabase/server";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-interface PropertyInquiryInput {
+interface PropertyChatMessageInput {
   propertyId: string;
+  conversationId: string | null;
+  accessToken: string;
   guestName: string | null;
   guestEmail: string;
   content: string;
 }
 
-type PropertyInquiryResult =
-  | { success: true }
+type PropertyChatMessageResult =
+  | {
+      success: true;
+      conversationId: string;
+      email: Parameters<typeof sendPropertyChatMessageEmails>[0];
+    }
   | {
       success: false;
-      status: 404 | 502 | 503;
+      status: 404 | 503;
       error: string;
-      saved?: boolean;
     };
 
-export async function createPropertyInquiry(
-  input: PropertyInquiryInput,
-): Promise<PropertyInquiryResult> {
+export async function sendPropertyChatMessage(
+  input: PropertyChatMessageInput,
+): Promise<PropertyChatMessageResult> {
   const supabase = await createClient();
   const { data: property, error: propertyError } = await supabase
     .from("properties")
@@ -32,7 +37,7 @@ export async function createPropertyInquiry(
     .maybeSingle();
 
   if (propertyError) {
-    console.error("Property inquiry lookup failed:", propertyError.message);
+    console.error("Property chat property lookup failed:", propertyError.message);
     return {
       success: false,
       status: 503,
@@ -54,7 +59,7 @@ export async function createPropertyInquiry(
     .maybeSingle();
 
   if (hostError) {
-    console.error("Property host lookup failed:", hostError.message);
+    console.error("Property chat host lookup failed:", hostError.message);
     return {
       success: false,
       status: 503,
@@ -69,25 +74,30 @@ export async function createPropertyInquiry(
     };
   }
 
-  const { error: inquiryError } = await supabase.rpc(
-    "create_property_inquiry",
+  const { data: conversationId, error: messageSaveError } = await supabase.rpc(
+    "create_property_chat_message",
     {
       p_property_id: property.id,
+      p_conversation_id: input.conversationId,
+      p_guest_access_token: input.accessToken,
       p_guest_email: input.guestEmail,
       p_guest_name: input.guestName,
       p_content: input.content,
     },
   );
 
-  if (inquiryError) {
-    if (inquiryError.code === "P0002") {
+  if (messageSaveError) {
+    if (messageSaveError.code === "P0002") {
       return {
         success: false,
         status: 404,
         error: "This property is no longer available.",
       };
     }
-    console.error("Property inquiry could not be saved:", inquiryError.message);
+    console.error(
+      "Property chat message could not be saved:",
+      messageSaveError.message,
+    );
     return {
       success: false,
       status: 503,
@@ -95,25 +105,25 @@ export async function createPropertyInquiry(
     };
   }
 
-  try {
-    await sendPropertyInquiryEmails({
+  if (typeof conversationId !== "string") {
+    console.error("Property chat RPC did not return a conversation ID.");
+    return {
+      success: false,
+      status: 503,
+      error: "Your message could not be saved. Please try again.",
+    };
+  }
+
+  return {
+    success: true,
+    conversationId,
+    email: {
       hostEmail: host.email,
       hostName: host.full_name || "the host",
       guestEmail: input.guestEmail,
       guestName: input.guestName,
       propertyName: property.title || "this property",
       message: input.content,
-    });
-  } catch (error) {
-    console.error("Property inquiry email delivery failed:", error);
-    return {
-      success: false,
-      status: 502,
-      error:
-        "Your message was saved, but email delivery could not be confirmed. Please try again later.",
-      saved: true,
-    };
-  }
-
-  return { success: true };
+    },
+  };
 }
