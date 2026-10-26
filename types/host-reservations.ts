@@ -4,6 +4,10 @@ export interface HostReservationProperty {
   city: string | null;
   country: string | null;
   property_media: { media_url: string }[] | null;
+  host_profile?: {
+    full_name: string | null;
+    email: string | null;
+  } | null;
 }
 
 export interface HostReservationGuest {

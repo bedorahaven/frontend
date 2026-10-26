@@ -32,9 +32,13 @@ const PAGE_SIZE = 8;
 
 interface ReservationsTableProps {
   reservations: HostReservation[];
+  adminMode?: boolean;
 }
 
-export function ReservationsTable({ reservations }: ReservationsTableProps) {
+export function ReservationsTable({
+  reservations,
+  adminMode = false,
+}: ReservationsTableProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -58,6 +62,8 @@ export function ReservationsTable({ reservations }: ReservationsTableProps) {
           reservation.property?.title,
           reservation.property?.city,
           reservation.guest?.full_name,
+          reservation.property?.host_profile?.full_name,
+          reservation.property?.host_profile?.email,
           getString(reservation.guest_name),
           getString(reservation.guest_email),
         ]
@@ -91,9 +97,13 @@ export function ReservationsTable({ reservations }: ReservationsTableProps) {
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div className="flex flex-col gap-4 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
-          <h2 className="text-base font-semibold text-foreground">All reservations</h2>
+          <h2 className="text-base font-semibold text-foreground">
+            {adminMode ? "All platform reservations" : "All reservations"}
+          </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Search and review the details for each guest stay.
+            {adminMode
+              ? "Search bookings across all listings, guests, and hosts."
+              : "Search and review the details for each guest stay."}
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -154,7 +164,7 @@ export function ReservationsTable({ reservations }: ReservationsTableProps) {
                 {visibleReservations.map((reservation) => (
                   <TableRow key={reservation.id} className="border-border/70">
                     <TableCell className="max-w-64 whitespace-normal px-5 py-4">
-                      <GuestListing reservation={reservation} />
+                      <GuestListing reservation={reservation} adminMode={adminMode} />
                       <p className="mt-2 font-mono text-[10px] text-muted-foreground">
                         #{reservation.id.slice(0, 8)}
                       </p>
@@ -187,7 +197,7 @@ export function ReservationsTable({ reservations }: ReservationsTableProps) {
                 className="rounded-xl border border-border bg-background p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <GuestListing reservation={reservation} />
+                  <GuestListing reservation={reservation} adminMode={adminMode} />
                   <StatusBadge status={reservation.status} />
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-3">
@@ -252,7 +262,13 @@ export function ReservationsTable({ reservations }: ReservationsTableProps) {
   );
 }
 
-function GuestListing({ reservation }: { reservation: HostReservation }) {
+function GuestListing({
+  reservation,
+  adminMode = false,
+}: {
+  reservation: HostReservation;
+  adminMode?: boolean;
+}) {
   const guestName =
     reservation.guest?.full_name ||
     getString(reservation.guest_name) ||
@@ -272,6 +288,14 @@ function GuestListing({ reservation }: { reservation: HostReservation }) {
         <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
           <MapPin className="size-3 shrink-0" />
           <span className="truncate">{location}</span>
+        </p>
+      )}
+      {adminMode && (
+        <p className="mt-1 truncate text-[11px] text-muted-foreground">
+          Host: {reservation.property?.host_profile?.full_name || "Unknown host"}
+          {reservation.property?.host_profile?.email
+            ? ` · ${reservation.property.host_profile.email}`
+            : ""}
         </p>
       )}
       {(reservation.guest?.email || getString(reservation.guest_email)) && (
