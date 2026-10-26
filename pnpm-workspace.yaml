@@ -1,5 +1,5 @@
 allowBuilds:
-  '@tsparticles/engine': set this to true or false
+  '@tsparticles/engine': false
   unrs-resolver: false
 minimumReleaseAgeExclude:
   - '@next/env@16.4.2'

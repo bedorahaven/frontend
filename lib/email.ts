@@ -1,3 +1,4 @@
+import 'server-only';
 import { Resend } from 'resend';
 
 function escapeHtml(value: string): string {
@@ -187,4 +188,80 @@ export async function sendPayoutVerificationCode(params: {
   }
 
   return data.id;
+}
+
+export async function sendPropertyInquiryEmails(params: {
+  hostEmail: string;
+  hostName: string;
+  guestEmail: string;
+  guestName: string | null;
+  propertyName: string;
+  message: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured.');
+  }
+
+  const from = process.env.RESEND_FROM_EMAIL;
+  if (!from) {
+    throw new Error(
+      'RESEND_FROM_EMAIL is not configured. Set it to a sender address verified in Resend.',
+    );
+  }
+
+  const resend = new Resend(apiKey);
+  const propertyName = escapeHtml(params.propertyName);
+  const guestName = escapeHtml(params.guestName || 'A prospective guest');
+  const message = escapeHtml(params.message).replace(/\n/g, '<br>');
+  const safePropertyName = params.propertyName.replace(/[\r\n]/g, ' ').slice(0, 100);
+  const hostName = escapeHtml(params.hostName);
+
+  const { data: hostEmail, error: hostEmailError } = await resend.emails.send({
+    from,
+    to: [params.hostEmail],
+    replyTo: params.guestEmail,
+    subject: `New inquiry about ${safePropertyName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 24px; color: #172033;">
+        <h2 style="margin: 0 0 8px;">A guest is interested in your property</h2>
+        <p style="color: #667085;">${guestName} sent you a message about <strong>${propertyName}</strong>.</p>
+        <div style="margin: 20px 0; padding: 16px; border-radius: 12px; background: #f4f7fb; line-height: 1.6;">
+          ${message}
+        </div>
+        <p style="font-size: 14px;">Reply to this email to respond directly to ${guestName} at ${escapeHtml(params.guestEmail)}.</p>
+      </div>
+    `,
+  });
+
+  if (hostEmailError) {
+    throw new Error(`Resend failed to notify the property host: ${hostEmailError.message}`);
+  }
+  if (!hostEmail?.id) {
+    throw new Error('Resend did not return a host inquiry email ID.');
+  }
+
+  const { data: guestEmail, error: guestEmailError } = await resend.emails.send({
+    from,
+    to: [params.guestEmail],
+    replyTo: params.hostEmail,
+    subject: `Your message to ${safePropertyName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 24px; color: #172033;">
+        <h2 style="margin: 0 0 8px;">Your message has been sent</h2>
+        <p style="color: #667085;">We sent your inquiry about <strong>${propertyName}</strong> to ${hostName}.</p>
+        <div style="margin: 20px 0; padding: 16px; border-radius: 12px; background: #f4f7fb; line-height: 1.6;">
+          ${message}
+        </div>
+        <p style="font-size: 14px;">The host can reply directly to this email.</p>
+      </div>
+    `,
+  });
+
+  if (guestEmailError) {
+    throw new Error(`Resend failed to send the guest inquiry confirmation: ${guestEmailError.message}`);
+  }
+  if (!guestEmail?.id) {
+    throw new Error('Resend did not return a guest inquiry email ID.');
+  }
 }

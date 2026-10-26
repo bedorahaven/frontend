@@ -37,6 +37,7 @@ import {
 import { getPropertyBookedDates, createBooking } from "@/lib/api/bookings";
 import { PropertyReviewsSummary } from "./property-reviews-summary";
 import { GuestAccountAccess } from "@/components/guest-account-access";
+import { PropertyChatWidget } from "@/components/property-chat-widget";
 
 interface BookingRecord {
   id: string;
@@ -53,9 +54,13 @@ interface BookingRecord {
 interface PropertyBookingWidgetProps {
   property: {
     id: string;
+    title: string;
     price_per_night: number;
     cleaning_fee?: number;
     max_guests?: number;
+    host?: {
+      full_name?: string | null;
+    } | null;
   };
 }
 
@@ -584,6 +589,13 @@ export function PropertyBookingWidget({
           )}
         </Button>
       </form>
+
+      <PropertyChatWidget
+        propertyId={property.id}
+        propertyName={property.title}
+        hostName={property.host?.full_name || "Your host"}
+        defaultEmail={email}
+      />
 
       <p className="text-center text-xs text-muted-foreground">
         You won&apos;t be charged until confirmed
