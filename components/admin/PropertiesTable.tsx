@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DataFilterBar } from "@/components/ui/data-filter-bar";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,6 @@ import {
 import {
   Building2,
   Plus,
-  Search,
   MapPin,
   CheckCircle2,
   XCircle,
@@ -130,20 +129,17 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
   return (
     <>
     <div className="space-y-4">
-      {/* Search Filter Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search properties by title or city..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="pl-9 text-xs"
-          />
-        </div>
+        <DataFilterBar
+          searchValue={searchQuery}
+          onSearchChange={(value) => {
+            setSearchQuery(value);
+            setCurrentPage(1);
+          }}
+          searchPlaceholder="Search properties by title or city"
+          searchLabel="Search properties"
+          className="w-full sm:max-w-sm"
+        />
         <Link
           href="/host/listings/new"
           className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90"

@@ -15,13 +15,11 @@ import {
   MapPin,
   Pencil,
   Plus,
-  Search,
   Trash2,
   Users,
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +31,7 @@ import {
 import { deleteProperty } from "@/lib/api/properties";
 import type { PropertyWithMedia } from "@/types/properties";
 import toast from "react-hot-toast";
+import { DataFilterBar } from "@/components/ui/data-filter-bar";
 
 type ManagedProperty = PropertyWithMedia & {
   host_profile?: { full_name: string; email: string | null } | null;
@@ -55,9 +54,16 @@ export function PropertyCards({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [deletingPropertyId, setDeletingPropertyId] = useState<string | null>(null);
+  const [deletingPropertyId, setDeletingPropertyId] = useState<string | null>(
+    null,
+  );
   const [propertyToDelete, setPropertyToDelete] =
     useState<PropertyWithMedia | null>(null);
+
+  const updateSearch = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
 
   const filteredProperties = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -138,19 +144,13 @@ export function PropertyCards({
     <>
       <div className="space-y-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full sm:max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search properties by title or city..."
-              value={searchQuery}
-              onChange={(event) => {
-                setSearchQuery(event.target.value);
-                setCurrentPage(1);
-              }}
-              aria-label="Search properties"
-              className="h-10 pl-9 text-sm"
-            />
-          </div>
+          <DataFilterBar
+            searchValue={searchQuery}
+            onSearchChange={updateSearch}
+            searchPlaceholder="Search properties by title or city"
+            searchLabel="Search properties"
+            className="w-full sm:max-w-sm"
+          />
           <div className="grid grid-cols-2 gap-2 sm:flex">
             <Button
               type="button"
@@ -369,7 +369,9 @@ export function PropertyCards({
             <Button
               type="button"
               variant="destructive"
-              disabled={propertyToDelete === null || deletingPropertyId !== null}
+              disabled={
+                propertyToDelete === null || deletingPropertyId !== null
+              }
               onClick={() => {
                 if (propertyToDelete) void handleDelete(propertyToDelete);
               }}

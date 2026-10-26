@@ -2,17 +2,13 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronLeft, ChevronRight, Search, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DataFilterBar,
+  DataFilterSelect,
+} from "@/components/ui/data-filter-bar";
 import {
   updateWithdrawalRequestStatus,
   type AdminWithdrawalRequest,
@@ -114,33 +110,27 @@ export function WithdrawalRequestsTable({
             Review payout details and record the result of manual settlements.
           </p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-[minmax(14rem,1fr)_12rem]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => setSearchValue(event.target.value)}
-              placeholder="Search host, method, or request ID"
-              aria-label="Search withdrawal requests"
-              className="h-10 pl-9 text-sm"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusValue}>
-            <SelectTrigger
-              aria-label="Filter withdrawal requests by status"
-              className="h-10 text-sm"
-            >
-              <SelectValue placeholder="Pending requests" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <DataFilterBar
+          searchValue={search}
+          onSearchChange={setSearchValue}
+          searchPlaceholder="Search host, method, or request ID"
+          searchLabel="Search withdrawal requests"
+          className="sm:grid-cols-[minmax(14rem,1fr)_minmax(10rem,12rem)]"
+        >
+          <DataFilterSelect
+            value={statusFilter}
+            onValueChange={setStatusValue}
+            ariaLabel="Filter withdrawal requests by status"
+            placeholder="Pending requests"
+            options={[
+              { value: "pending", label: "Pending" },
+              { value: "all", label: "All statuses" },
+              { value: "completed", label: "Completed" },
+              { value: "failed", label: "Failed" },
+              { value: "cancelled", label: "Cancelled" },
+            ]}
+          />
+        </DataFilterBar>
       </header>
 
       {visible.length === 0 ? (

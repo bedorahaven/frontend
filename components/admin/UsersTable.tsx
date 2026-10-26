@@ -7,11 +7,10 @@ import {
   Mail,
   MapPin,
   Phone,
-  Search,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { DataFilterBar } from "@/components/ui/data-filter-bar";
 import type { UserRole } from "@/types/profile";
 import { formatJoinedDate } from "@/lib/utils";
 
@@ -76,19 +75,16 @@ export function UsersTable({ users }: UsersTableProps) {
   return (
     <section className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Search by name, email, phone, or location"
-            aria-label="Search users"
-            className="h-10 pl-9 text-sm"
-          />
-        </div>
+        <DataFilterBar
+          searchValue={search}
+          onSearchChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          searchPlaceholder="Search by name, email, phone, or location"
+          searchLabel="Search users"
+          className="w-full sm:max-w-md"
+        />
         <button
           type="button"
           onClick={() =>
@@ -224,4 +220,3 @@ export function UsersTable({ users }: UsersTableProps) {
     </section>
   );
 }
-

@@ -16,7 +16,7 @@ interface DataFilterBarProps {
   onSearchChange: (value: string) => void;
   searchPlaceholder: string;
   searchLabel: string;
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
 }
 
