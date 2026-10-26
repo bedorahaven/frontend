@@ -24,6 +24,10 @@ import {
   Building2,
   CalendarDays,
   Wallet,
+  CreditCard,
+  ShieldCheck,
+  Users,
+  Star,
 } from "lucide-react";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import { Profile } from "@/types/profile";
@@ -133,6 +137,7 @@ function HeaderContent() {
   const displayEmail = user?.email || "";
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
   const isHost = profile?.role === "host";
+  const isAdmin = profile?.role === "admin";
 
   return (
     <>
@@ -215,7 +220,7 @@ function HeaderContent() {
             </Link>
 
             {/* Show "Become a host" only if NOT logged in as a host */}
-            {profile?.role !== "host" && (
+            {profile?.role !== "host" && profile?.role !== "admin" && (
               <Link
                 href={
                   user
@@ -237,6 +242,15 @@ function HeaderContent() {
               >
                 <Home className="w-3.5 h-3.5" />
                 Host Dashboard
+              </Link>
+            )}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="hidden lg:inline-flex items-center gap-1.5 text-xs font-semibold py-2 px-3.5 rounded-full bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Admin Dashboard
               </Link>
             )}
             <button
@@ -287,8 +301,66 @@ function HeaderContent() {
                   <div className="py-1">
                     {user ? (
                       <>
-                        {/* HOST-ONLY AIRBNB / BOOKING.COM MENU */}
-                        {isHost ? (
+                        {isAdmin ? (
+                          <>
+                            <Link
+                              href="/admin"
+                              onClick={() => setIsMenuOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2 text-sm font-semibold text-accent transition-colors hover:bg-muted"
+                            >
+                              <ShieldCheck className="w-4 h-4" />
+                              <span>Admin Dashboard</span>
+                            </Link>
+                            <Link
+                              href="/admin/users"
+                              onClick={() => setIsMenuOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-muted"
+                            >
+                              <Users className="w-4 h-4 text-muted-foreground" />
+                              <span>Manage Users</span>
+                            </Link>
+                            <Link
+                              href="/admin/listings"
+                              onClick={() => setIsMenuOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-muted"
+                            >
+                              <Building2 className="w-4 h-4 text-muted-foreground" />
+                              <span>Manage Listings</span>
+                            </Link>
+                            <Link
+                              href="/admin/reservations"
+                              onClick={() => setIsMenuOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-muted"
+                            >
+                              <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                              <span>Reservations</span>
+                            </Link>
+                            <Link
+                              href="/admin/reviews"
+                              onClick={() => setIsMenuOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-muted"
+                            >
+                              <Star className="w-4 h-4 text-muted-foreground" />
+                              <span>Guest Reviews</span>
+                            </Link>
+                            <Link
+                              href="/admin/earnings"
+                              onClick={() => setIsMenuOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-muted"
+                            >
+                              <Wallet className="w-4 h-4 text-muted-foreground" />
+                              <span>Earnings</span>
+                            </Link>
+                            <Link
+                              href="/admin/withdrawals"
+                              onClick={() => setIsMenuOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-muted"
+                            >
+                              <CreditCard className="w-4 h-4 text-muted-foreground" />
+                              <span>Withdrawals</span>
+                            </Link>
+                          </>
+                        ) : isHost ? (
                           <>
                             <Link
                               href="/host"
@@ -313,6 +385,14 @@ function HeaderContent() {
                             >
                               <Wallet className="w-4 h-4 text-muted-foreground" />
                               <span>Earnings</span>
+                            </Link>
+                            <Link
+                              href="/host/withdrawals"
+                              onClick={() => setIsMenuOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-muted transition-colors"
+                            >
+                              <CreditCard className="w-4 h-4 text-muted-foreground" />
+                              <span>Withdrawals</span>
                             </Link>
                             <Link
                               href="/host/messages"
@@ -368,7 +448,7 @@ function HeaderContent() {
                   <div className="border-t border-border my-1"></div>
 
                   <div className="py-1">
-                    {!isHost && (
+                    {!isHost && !isAdmin && (
                       <Link
                         href="/onboarding?role=host"
                         onClick={() => setIsMenuOpen(false)}
