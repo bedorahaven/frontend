@@ -45,7 +45,13 @@ export function ReservationsTable({
 
   const statuses = useMemo(
     () =>
-      [...new Set(reservations.map((reservation) => reservation.status?.toLowerCase()).filter(Boolean))] as string[],
+      [
+        ...new Set(
+          reservations
+            .map((reservation) => reservation.status?.toLowerCase())
+            .filter(Boolean),
+        ),
+      ] as string[],
     [reservations],
   );
 
@@ -53,7 +59,10 @@ export function ReservationsTable({
     const query = search.trim().toLowerCase();
     return [...reservations]
       .filter((reservation) => {
-        if (statusFilter !== "all" && reservation.status?.toLowerCase() !== statusFilter) {
+        if (
+          statusFilter !== "all" &&
+          reservation.status?.toLowerCase() !== statusFilter
+        ) {
           return false;
         }
         if (!query) return true;
@@ -75,7 +84,10 @@ export function ReservationsTable({
       .sort((a, b) => getStartDate(b).localeCompare(getStartDate(a)));
   }, [reservations, search, statusFilter]);
 
-  const pageCount = Math.max(1, Math.ceil(filteredReservations.length / PAGE_SIZE));
+  const pageCount = Math.max(
+    1,
+    Math.ceil(filteredReservations.length / PAGE_SIZE),
+  );
   const visibleReservations = filteredReservations.slice(
     (page - 1) * PAGE_SIZE,
     page * PAGE_SIZE,
@@ -118,7 +130,10 @@ export function ReservationsTable({
             />
           </div>
           <Select value={statusFilter} onValueChange={updateStatus}>
-            <SelectTrigger aria-label="Filter by reservation status" className="h-10 w-full text-sm sm:w-40">
+            <SelectTrigger
+              aria-label="Filter by reservation status"
+              className="h-10 w-full text-sm sm:w-40"
+            >
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
@@ -139,7 +154,9 @@ export function ReservationsTable({
             <CalendarDays className="size-5" aria-hidden="true" />
           </span>
           <h3 className="mt-4 text-sm font-semibold text-foreground">
-            {reservations.length === 0 ? "No reservations yet" : "No matching reservations"}
+            {reservations.length === 0
+              ? "No reservations yet"
+              : "No matching reservations"}
           </h3>
           <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
             {reservations.length === 0
@@ -153,21 +170,31 @@ export function ReservationsTable({
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="px-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Guest & listing</TableHead>
-                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Stay</TableHead>
-                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Guests</TableHead>
-                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total</TableHead>
-                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status</TableHead>
+                  <TableHead className="px-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Guest & listing
+                  </TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Stay
+                  </TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Guests
+                  </TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Total
+                  </TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Status
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {visibleReservations.map((reservation) => (
                   <TableRow key={reservation.id} className="border-border/70">
                     <TableCell className="max-w-64 whitespace-normal px-5 py-4">
-                      <GuestListing reservation={reservation} adminMode={adminMode} />
-                      <p className="mt-2 font-mono text-[10px] text-muted-foreground">
-                        #{reservation.id.slice(0, 8)}
-                      </p>
+                      <GuestListing
+                        reservation={reservation}
+                        adminMode={adminMode}
+                      />
                     </TableCell>
                     <TableCell className="py-4">
                       <StayDetails reservation={reservation} />
@@ -197,25 +224,42 @@ export function ReservationsTable({
                 className="rounded-xl border border-border bg-background p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <GuestListing reservation={reservation} adminMode={adminMode} />
+                  <GuestListing
+                    reservation={reservation}
+                    adminMode={adminMode}
+                  />
                   <StatusBadge status={reservation.status} />
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-3">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Stay</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Stay
+                    </p>
                     <StayDetails reservation={reservation} className="mt-1" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Guests</p>
-                    <p className="mt-1 text-xs text-foreground">{getGuestCount(reservation)}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Guests
+                    </p>
+                    <p className="mt-1 text-xs text-foreground">
+                      {getGuestCount(reservation)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">{formatPrice(reservation.total_price)}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Total
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {formatPrice(reservation.total_price)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Booking ID</p>
-                    <p className="mt-1 font-mono text-xs text-foreground">#{reservation.id.slice(0, 8)}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Booking ID
+                    </p>
+                    <p className="mt-1 font-mono text-xs text-foreground">
+                      #{reservation.id.slice(0, 8)}
+                    </p>
                   </div>
                 </div>
               </article>
@@ -250,7 +294,9 @@ export function ReservationsTable({
               variant="outline"
               size="icon-sm"
               aria-label="Next page"
-              onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+              onClick={() =>
+                setPage((current) => Math.min(pageCount, current + 1))
+              }
               disabled={page === pageCount}
             >
               <ChevronRight />
@@ -275,15 +321,20 @@ function GuestListing({
     getString(reservation.full_name) ||
     "Guest";
   const propertyName =
-    reservation.property?.title || `Listing ${reservation.property_id.slice(0, 8)}`;
+    reservation.property?.title ||
+    `Listing ${reservation.property_id.slice(0, 8)}`;
   const location = [reservation.property?.city, reservation.property?.country]
     .filter(Boolean)
     .join(", ");
 
   return (
     <div className="min-w-0">
-      <p className="truncate text-sm font-semibold text-foreground">{guestName}</p>
-      <p className="mt-0.5 truncate text-xs text-muted-foreground">{propertyName}</p>
+      <p className="truncate text-sm font-semibold text-foreground">
+        {guestName}
+      </p>
+      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+        {propertyName}
+      </p>
       {location && (
         <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
           <MapPin className="size-3 shrink-0" />
@@ -292,7 +343,8 @@ function GuestListing({
       )}
       {adminMode && (
         <p className="mt-1 truncate text-[11px] text-muted-foreground">
-          Host: {reservation.property?.host_profile?.full_name || "Unknown host"}
+          Host:{" "}
+          {reservation.property?.host_profile?.full_name || "Unknown host"}
           {reservation.property?.host_profile?.email
             ? ` · ${reservation.property.host_profile.email}`
             : ""}
@@ -306,12 +358,16 @@ function GuestListing({
           {reservation.guest?.email || getString(reservation.guest_email)}
         </a>
       )}
-      {(reservation.guest?.phone_number || getString(reservation.phone_number)) && (
+      {(reservation.guest?.phone_number ||
+        getString(reservation.phone_number)) && (
         <a
           href={`tel:${reservation.guest?.phone_number || getString(reservation.phone_number)}`}
           className="mt-1 block text-[11px] text-accent hover:underline"
         >
-          {reservation.guest?.phone_number || getString(reservation.phone_number)}
+          {" "}
+          Phone:
+          {reservation.guest?.phone_number ||
+            getString(reservation.phone_number)}
         </a>
       )}
     </div>
@@ -328,25 +384,57 @@ function StayDetails({
   const startDate = getStartDate(reservation);
   const endDate = getEndDate(reservation);
   const nights = getNights(reservation, startDate, endDate);
+  const upcoming = isUpcomingStay(reservation, startDate);
   return (
     <div className={className}>
       <p className="text-xs font-medium text-foreground">
-        {formatDate(startDate)} <span className="text-muted-foreground">to</span>{" "}
-        {formatDate(endDate)}
+        {formatDate(startDate)}{" "}
+        <span className="text-muted-foreground">to</span> {formatDate(endDate)}
       </p>
       <p className="mt-1 text-[11px] text-muted-foreground">
-        {nights === null ? "Duration unavailable" : `${nights} ${nights === 1 ? "night" : "nights"}`}
+        {nights === null
+          ? "Duration unavailable"
+          : `${nights} ${nights === 1 ? "night" : "nights"}`}
       </p>
+      {upcoming && (
+        <span className="mt-2 inline-flex items-center rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:text-sky-300">
+          Upcoming stay
+        </span>
+      )}
     </div>
+  );
+}
+
+function isUpcomingStay(
+  reservation: HostReservation,
+  startDate: string,
+): boolean {
+  const start = startDate.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return false;
+
+  const today = new Date();
+  const todayString = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
+  const status = reservation.status?.toLowerCase();
+  return (
+    start > todayString &&
+    status !== "cancelled" &&
+    status !== "canceled" &&
+    status !== "rejected"
   );
 }
 
 function StatusBadge({ status }: { status: string | null }) {
   const normalized = status?.toLowerCase() ?? "unknown";
   const styles: Record<string, string> = {
-    confirmed: "bg-emerald-500/10 text-emerald-700 ring-emerald-600/20 dark:text-emerald-300",
+    confirmed:
+      "bg-emerald-500/10 text-emerald-700 ring-emerald-600/20 dark:text-emerald-300",
     completed: "bg-sky-500/10 text-sky-700 ring-sky-600/20 dark:text-sky-300",
-    pending: "bg-amber-500/10 text-amber-800 ring-amber-600/20 dark:text-amber-300",
+    pending:
+      "bg-amber-500/10 text-amber-800 ring-amber-600/20 dark:text-amber-300",
     cancelled: "bg-destructive/10 text-destructive ring-destructive/20",
     canceled: "bg-destructive/10 text-destructive ring-destructive/20",
     rejected: "bg-destructive/10 text-destructive ring-destructive/20",
@@ -368,14 +456,14 @@ function getString(value: unknown): string | null {
 
 function getStartDate(reservation: HostReservation): string {
   return (
-    getString(reservation.start_date) ??
-    getString(reservation.check_in) ??
-    ""
+    getString(reservation.start_date) ?? getString(reservation.check_in) ?? ""
   );
 }
 
 function getEndDate(reservation: HostReservation): string {
-  return getString(reservation.end_date) ?? getString(reservation.check_out) ?? "";
+  return (
+    getString(reservation.end_date) ?? getString(reservation.check_out) ?? ""
+  );
 }
 
 function getNights(
@@ -388,13 +476,16 @@ function getNights(
   if (!startDate || !endDate) return null;
   const start = Date.parse(`${startDate.slice(0, 10)}T00:00:00Z`);
   const end = Date.parse(`${endDate.slice(0, 10)}T00:00:00Z`);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
+    return null;
   return Math.round((end - start) / 86_400_000);
 }
 
 function getGuestCount(reservation: HostReservation): string {
   const count = Number(
-    reservation.guests_count ?? reservation.guest_count ?? reservation.number_of_guests,
+    reservation.guests_count ??
+      reservation.guest_count ??
+      reservation.number_of_guests,
   );
   return Number.isFinite(count) && count > 0
     ? `${count} ${count === 1 ? "guest" : "guests"}`
