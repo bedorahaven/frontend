@@ -55,6 +55,7 @@ create index if not exists payout_methods_host_id_idx
 
 alter table public.payout_methods enable row level security;
 grant select, insert, update, delete on table public.payout_methods to authenticated;
+grant select, insert, update on table public.payout_methods to service_role;
 
 drop policy if exists "Hosts can manage their payout methods"
   on public.payout_methods;

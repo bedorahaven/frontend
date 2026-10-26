@@ -301,8 +301,32 @@ export async function beginPayoutMethodVerification(
   }
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
-  const email = authData.user?.email?.trim();
-  if (authError || !email) {
+  let email = authData.user?.email?.trim() || null;
+  if (!email) {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error(
+        "Payout verification profile email lookup failed:",
+        profileError.message,
+      );
+      return {
+        success: false,
+        error: "Unable to load your account email. Please try again.",
+      };
+    }
+
+    email = profile?.email?.trim() || null;
+  }
+
+  if (!email) {
+    if (authError) {
+      console.error("Payout verification auth email lookup failed:", authError.message);
+    }
     return {
       success: false,
       error: "Add a valid email address to your account before verifying M-Pesa.",
