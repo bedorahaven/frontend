@@ -1,11 +1,9 @@
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { Banknote, Building2, ReceiptText, CalendarCheck2 } from "lucide-react";
-import { TransactionsTable } from "@/components/host/TransactionsTable";
+import { EarningsOverview } from "@/components/host/EarningsOverview";
 import { getHostEarnings } from "@/lib/api/transactions";
 import type { HostEarningsData } from "@/lib/api/transactions";
-import { SummaryCard } from "@/components/host/SummaryCard";
 
 export default function HostEarningsPage() {
   return (
@@ -42,69 +40,8 @@ async function EarningsContent() {
     );
   }
 
-  const completedEarnings = earnings.transactions
-    .filter((transaction) => transaction.status === "completed")
-    .reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
-  const pendingAmount = earnings.transactions
-    .filter((transaction) => transaction.status === "pending")
-    .reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
-
-  const currency =
-    earnings.transactions.find((transaction) => transaction.currency)
-      ?.currency ?? "KSh";
-
   return (
-    <>
-      <section
-        aria-label="Earnings overview"
-        className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 pt-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0"
-      >
-        <div
-          className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink"
-        >
-          <SummaryCard
-            label="Completed earnings"
-            value={formatCurrency(completedEarnings, currency)}
-            detail="Successful payments received"
-            icon={Banknote}
-            accent="green"
-          />
-        </div>
-        <div className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink">
-          <SummaryCard
-            label="Transactions"
-            value={earnings.transactions.length.toLocaleString()}
-            detail="All payment attempts"
-            icon={ReceiptText}
-            accent="blue"
-          />
-        </div>
-        <div className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink">
-          <SummaryCard
-            label="Total bookings"
-            value={earnings.bookingsCount.toLocaleString()}
-            detail="Bookings across your properties"
-            icon={CalendarCheck2}
-            accent="violet"
-          />
-        </div>
-        <div className="w-[85vw] max-w-[320px] shrink-0 snap-center sm:w-auto sm:max-w-none sm:shrink">
-          <SummaryCard
-            label="Your properties"
-            value={earnings.propertiesCount.toLocaleString()}
-            detail={
-              pendingAmount > 0
-                ? `${formatCurrency(pendingAmount, currency)} pending`
-                : "Listings in your host account"
-            }
-            icon={Building2}
-            accent="amber"
-          />
-        </div>
-      </section>
-
-      <TransactionsTable transactions={earnings.transactions} />
-    </>
+    <EarningsOverview earnings={earnings} />
   );
 }
 
@@ -137,12 +74,4 @@ function PageHeading() {
       </div>
     </header>
   );
-}
-
-function formatCurrency(amount: number, currency: string): string {
-  return new Intl.NumberFormat("en-KE", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
 }

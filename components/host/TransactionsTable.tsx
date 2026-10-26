@@ -32,9 +32,13 @@ type DateFilter = "all" | "30" | "90";
 
 interface TransactionsTableProps {
   transactions: HostEarningsTransaction[];
+  adminMode?: boolean;
 }
 
-export function TransactionsTable({ transactions }: TransactionsTableProps) {
+export function TransactionsTable({
+  transactions,
+  adminMode = false,
+}: TransactionsTableProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
@@ -84,6 +88,8 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
           transaction.property?.city,
           transaction.guest?.full_name,
           transaction.guest?.email,
+          transaction.property?.host_profile?.full_name,
+          transaction.property?.host_profile?.email,
         ]
           .filter(Boolean)
           .join(" ")
@@ -133,7 +139,9 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
             Transactions
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Payment history for bookings at your properties.
+            {adminMode
+              ? "Payment history for bookings across all platform listings."
+              : "Payment history for bookings at your properties."}
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-[minmax(14rem,1fr)_10rem_10rem]">
@@ -191,7 +199,9 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
           </h3>
           <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
             {transactions.length === 0
-              ? "Payment records for your bookings will appear here."
+              ? adminMode
+                ? "Payment records for platform bookings will appear here."
+                : "Payment records for your bookings will appear here."
               : "Try changing your search or filters."}
           </p>
         </div>
@@ -225,7 +235,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                       <TransactionIdentity transaction={transaction} />
                     </TableCell>
                     <TableCell className="max-w-64 whitespace-normal py-4">
-                      <BookingProperty transaction={transaction} />
+                      <BookingProperty transaction={transaction} adminMode={adminMode} />
                     </TableCell>
                     <TableCell className="py-4">
                       <GuestInfo transaction={transaction} />
@@ -260,7 +270,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                   <TransactionStatus status={transaction.status} />
                 </div>
                 <div className="mt-3 border-t border-border pt-3">
-                  <BookingProperty transaction={transaction} />
+                  <BookingProperty transaction={transaction} adminMode={adminMode} />
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3">
                   <div>
@@ -346,8 +356,10 @@ function TransactionIdentity({
 
 function BookingProperty({
   transaction,
+  adminMode = false,
 }: {
   transaction: HostEarningsTransaction;
+  adminMode?: boolean;
 }) {
   return (
     <div>
@@ -362,6 +374,14 @@ function BookingProperty({
         <p className="mt-1 text-[11px] text-muted-foreground">
           {formatDate(transaction.booking.check_in)} –{" "}
           {formatDate(transaction.booking.check_out)}
+        </p>
+      )}
+      {adminMode && (
+        <p className="mt-1 max-w-56 truncate text-[11px] text-muted-foreground">
+          Host: {transaction.property?.host_profile?.full_name || "Unknown host"}
+          {transaction.property?.host_profile?.email
+            ? ` · ${transaction.property.host_profile.email}`
+            : ""}
         </p>
       )}
     </div>

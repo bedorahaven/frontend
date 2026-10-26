@@ -2,9 +2,14 @@ import type { Transaction } from "@/types/transactions";
 
 export interface HostEarningsProperty {
   id: string;
+  host_id?: string;
   title: string;
   city: string | null;
   country: string | null;
+  host_profile?: {
+    full_name: string | null;
+    email: string | null;
+  } | null;
 }
 
 export interface HostEarningsBooking {
