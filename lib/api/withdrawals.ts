@@ -84,7 +84,7 @@ export async function savePayoutMethod(input: {
     return { success: false, error: "Choose a supported payout method." };
   }
 
-  let bankCode = typeof input.bankCode === "string" ? input.bankCode.trim() : "";
+  const bankCode = typeof input.bankCode === "string" ? input.bankCode.trim() : "";
   const accountNumber =
     typeof input.accountNumber === "string"
       ? input.accountNumber.replace(/\s+/g, "")
@@ -154,82 +154,71 @@ export async function savePayoutMethod(input: {
       };
     }
 
-    let resolvedAccountName: string | null = null;
-    let resolvedBankCode: string | null = null;
-    let lastResolutionMessage: string | null = null;
-    let lastResolutionReturnedNoName = false;
-    for (const candidateCode of selectedBank.codes) {
-      const resolveUrl = new URL("https://api.paystack.co/bank/resolve");
-      resolveUrl.searchParams.set("account_number", accountNumber);
-      resolveUrl.searchParams.set("bank_code", candidateCode);
+    const resolveUrl = new URL("https://api.paystack.co/bank/resolve");
+    resolveUrl.searchParams.set("account_number", accountNumber);
+    resolveUrl.searchParams.set("bank_code", bankCode);
 
-      let resolveResponse: Response;
-      try {
-        resolveResponse = await fetch(resolveUrl, {
-          headers: { Authorization: `Bearer ${secretKey}` },
-          signal: AbortSignal.timeout(10_000),
-        });
-      } catch (error) {
-        console.error("Paystack payout account resolution request failed:", error);
-        return {
-          success: false,
-          error: "Unable to verify this account right now. Please try again.",
-        };
-      }
+    let resolveResponse: Response;
+    try {
+      resolveResponse = await fetch(resolveUrl, {
+        headers: { Authorization: `Bearer ${secretKey}` },
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (error) {
+      console.error("Paystack payout account resolution request failed:", error);
+      return {
+        success: false,
+        error: "Unable to verify this account right now. Please try again.",
+      };
+    }
 
-      let resolveBody: unknown;
-      try {
-        resolveBody = await resolveResponse.json();
-      } catch {
-        console.error("Paystack account resolution returned invalid JSON.");
-        return {
-          success: false,
-          error: "Account verification returned an invalid response.",
-        };
-      }
+    let resolveBody: unknown;
+    try {
+      resolveBody = await resolveResponse.json();
+    } catch {
+      console.error("Paystack account resolution returned invalid JSON.");
+      return {
+        success: false,
+        error: "Account verification returned an invalid response.",
+      };
+    }
 
-      const candidateData =
-        isRecord(resolveBody) && isRecord(resolveBody.data)
-          ? resolveBody.data
-          : null;
-      if (isRecord(resolveBody) && typeof resolveBody.message === "string") {
-        lastResolutionMessage = resolveBody.message;
-      }
-      if (
+    const resolvedData =
+      isRecord(resolveBody) && isRecord(resolveBody.data)
+        ? resolveBody.data
+        : null;
+    const providerMessage =
+      isRecord(resolveBody) && typeof resolveBody.message === "string"
+        ? resolveBody.message
+        : null;
+    const resolvedAccountName =
+      resolveResponse.ok &&
+      isRecord(resolveBody) &&
+      resolveBody.status === true &&
+      resolvedData &&
+      typeof resolvedData.account_name === "string" &&
+      resolvedData.account_name.trim().length >= 2
+        ? resolvedData.account_name.trim()
+        : null;
+
+    if (!resolvedAccountName) {
+      const detail =
         resolveResponse.ok &&
         isRecord(resolveBody) &&
         resolveBody.status === true &&
-        candidateData &&
-        typeof candidateData.account_name === "string" &&
-        candidateData.account_name.trim().length >= 2
-      ) {
-        resolvedAccountName = candidateData.account_name.trim();
-        resolvedBankCode = candidateCode;
-        break;
-      }
-      lastResolutionReturnedNoName ||= Boolean(
-        resolveResponse.ok &&
-          isRecord(resolveBody) &&
-          resolveBody.status === true &&
-          candidateData,
-      );
-    }
-
-    if (!resolvedAccountName || !resolvedBankCode) {
-      const detail = lastResolutionReturnedNoName
-        ? "Paystack accepted the request but did not return an account-holder name."
-        : lastResolutionMessage
-          ? `Paystack says: ${lastResolutionMessage.replace(/[\r\n]/g, " ").slice(0, 180)}`
-          : "Paystack could not resolve this bank and account-number combination.";
+        resolvedData
+          ? "Paystack accepted the request but did not return an account-holder name."
+          : providerMessage
+            ? `Paystack says: ${providerMessage.replace(/[\r\n]/g, " ").slice(0, 180)}`
+            : "Paystack could not resolve this bank and account-number combination.";
       return {
         success: false,
         error: `${detail} The bank may be listed by Paystack but not support account resolution for this account type. Contact support or choose another payout method.`,
       };
     }
-
     bankName = selectedBank.name;
     accountName = resolvedAccountName.slice(0, 100);
-    bankCode = resolvedBankCode;
+    accountName = resolvedAccountName.slice(0, 100);
 
     if (!hasMatchingName(profile.full_name, accountName)) {
       return {
