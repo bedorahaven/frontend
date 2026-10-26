@@ -4,7 +4,6 @@ import { createClient } from '@/utils/supabase/server';
 export interface Review {
   id: string;
   property_id: string;
-  user_name: string;
   rating: number;
   comment: string;
   created_at: string;
@@ -175,31 +174,26 @@ export async function listReviewsForDashboard(
 }
 
 export async function listPropertyReviews(propertyId: string) {
-  try {
-    const supabase = await createClient();
-    const { data: reviews, error } = await supabase
-      .from('reviews')
-      .select('*')
-      .eq('property_id', propertyId)
-      .order('created_at', { ascending: false });
+  const supabase = await createClient();
+  const { data: reviews, error } = await supabase
+    .from('public_property_reviews')
+    .select('id, property_id, rating, comment, created_at')
+    .eq('property_id', propertyId)
+    .order('created_at', { ascending: false });
 
-    if (error) {
-      console.warn('Reviews warning:', error.message);
-      return [];
-    }
-
-    return reviews || [];
-  } catch (err) {
-    console.warn('Exception in listPropertyReviews:', err);
-    return [];
+  if (error) {
+    console.error('Public property reviews fetch failed:', error.message);
+    throw new Error('Unable to load reviews for this property.');
   }
+
+  return reviews ?? [];
 }
 
 export async function getPropertyReviewStats(propertyId: string) {
   const reviews = await listPropertyReviews(propertyId);
 
   if (reviews.length === 0) {
-    return { averageRating: 4.92, totalReviews: 48, reviews: [] };
+    return { averageRating: 0, totalReviews: 0, reviews: [] };
   }
 
   const sum = reviews.reduce((acc, r) => acc + Number(r.rating || 5), 0);
@@ -213,23 +207,22 @@ export async function getPropertyReviewStats(propertyId: string) {
 }
 
 export async function getPropertyRatingSummary(propertyId: string) {
-  try {
-    const supabase = await createClient();
-    const { data: reviews, error } = await supabase
-      .from('reviews')
-      .select('rating')
-      .eq('property_id', propertyId);
+  const supabase = await createClient();
+  const { data: reviews, error } = await supabase
+    .from('public_property_reviews')
+    .select('rating')
+    .eq('property_id', propertyId);
 
-    if (error || !reviews || reviews.length === 0) {
-      return { rating: 4.92, count: 48 };
-    }
-
-    const sum = reviews.reduce((acc, r) => acc + Number(r.rating || 5), 0);
-    return {
-      rating: Number((sum / reviews.length).toFixed(2)),
-      count: reviews.length,
-    };
-  } catch {
-    return { rating: 4.92, count: 48 };
+  if (error) {
+    console.error('Public property rating fetch failed:', error.message);
+    throw new Error('Unable to load the property rating.');
   }
+
+  if (!reviews?.length) return { rating: 0, count: 0 };
+
+  const sum = reviews.reduce((acc, review) => acc + Number(review.rating), 0);
+  return {
+    rating: Number((sum / reviews.length).toFixed(2)),
+    count: reviews.length,
+  };
 }

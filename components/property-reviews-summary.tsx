@@ -9,15 +9,19 @@ interface PropertyReviewsSummaryProps {
 }
 
 export function PropertyReviewsSummary({ propertyId }: PropertyReviewsSummaryProps) {
-  const [rating, setRating] = useState<number>(4.92);
-  const [count, setCount] = useState<number>(48);
+  const [rating, setRating] = useState<number>(0);
+  const [count, setCount] = useState<number>(0);
 
   useEffect(() => {
     async function loadStats() {
       if (!propertyId) return;
-      const stats = await getPropertyRatingSummary(propertyId);
-      setRating(stats.rating);
-      setCount(stats.count);
+      try {
+        const stats = await getPropertyRatingSummary(propertyId);
+        setRating(stats.rating);
+        setCount(stats.count);
+      } catch (error) {
+        console.error('Property review summary failed:', error);
+      }
     }
 
     loadStats();
