@@ -20,6 +20,9 @@ export interface HostEarningsBooking {
   check_out: string | null;
   guests_count: number | null;
   total_nights: number | null;
+  total_price: number | string | null;
+  tax_fee: number | string | null;
+  service_fee: number | string | null;
 }
 
 export interface HostEarningsGuest {

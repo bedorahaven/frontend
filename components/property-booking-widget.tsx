@@ -35,6 +35,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { getPropertyBookedDates, createBooking } from "@/lib/api/bookings";
+import { calculateBookingPrice } from "@/lib/booking-pricing";
 import { PropertyReviewsSummary } from "./property-reviews-summary";
 import { GuestAccountAccess } from "@/components/guest-account-access";
 import { PropertyChatWidget } from "@/components/property-chat-widget";
@@ -68,11 +69,6 @@ export function PropertyBookingWidget({
   property,
 }: PropertyBookingWidgetProps) {
   const basePrice = Number(property.price_per_night || 0);
-
-  // Service fee: 3% of the base price
-  const serviceFee = basePrice * 0.03;
-  // Tax: 16% applied to base price + service fee
-  const tax = (basePrice + serviceFee) * 0.16;
   const maxGuests = property.max_guests || 4;
 
   const [checkIn, setCheckIn] = useState<Date | undefined>(undefined);
@@ -146,11 +142,8 @@ export function PropertyBookingWidget({
     checkIn && checkOut ? differenceInDays(checkOut, checkIn) : 1;
   const guestCountNum = Number(guestsCount) || 1;
 
-  const guestMultiplier =
-    guestCountNum > 2 ? 1 + (guestCountNum - 2) * 0.05 : 1;
-  const nightlyRateWithGuests = Math.round(basePrice * guestMultiplier);
-  const accommodationTotal = nightlyRateWithGuests * nights;
-  const grandTotal = accommodationTotal + tax + serviceFee;
+  const pricing = calculateBookingPrice(basePrice, nights, guestCountNum);
+  const grandTotal = pricing.total;
 
   const handleDateSelect = (range: DateRange | undefined) => {
     if (range?.from) {
@@ -282,7 +275,7 @@ export function PropertyBookingWidget({
             authorizationUrl.protocol === "https:" &&
             authorizationUrl.hostname === "checkout.paystack.com"
           ) {
-            window.location.href = authorizationUrl.toString();
+            window.location.assign(authorizationUrl.toString());
             return;
           }
         }
@@ -601,28 +594,12 @@ export function PropertyBookingWidget({
         You won&apos;t be charged until confirmed
       </p>
 
-      {/* Price breakdown */}
+      {/* Show the guest-facing total only; fee details are shown to hosts in the listing form. */}
       <div className="space-y-3 pt-4 border-t border-border text-xs">
         <div className="flex justify-between">
           <span className="text-muted-foreground">
-            KSh {nightlyRateWithGuests.toLocaleString()} × {nights} night
-            {nights > 1 ? "s" : ""}{" "}
-            {guestCountNum > 2 ? `(${guestCountNum} guests)` : ""}
+            Total for {nights} night{nights > 1 ? "s" : ""}
           </span>
-          <span>KSh {accommodationTotal.toLocaleString()}</span>
-        </div>
-        {tax > 0 && (
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Tax (16%)</span>
-            <span>KSh {tax.toLocaleString()}</span>
-          </div>
-        )}
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Service fee (3%)</span>
-          <span>KSh {serviceFee.toLocaleString()}</span>
-        </div>
-        <div className="pt-3 border-t border-border flex justify-between font-bold text-sm">
-          <span>Total</span>
           <span>KSh {grandTotal.toLocaleString()}</span>
         </div>
       </div>

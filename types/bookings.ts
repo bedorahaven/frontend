@@ -9,6 +9,8 @@ export interface Booking {
   total_nights: number; // integer
   guests_count: number; // integer
   total_price: number; // numeric(10, 2)
+  tax_fee: number; // numeric(10, 2)
+  service_fee: number; // numeric(10, 2)
   status: BookingStatus; // public.booking_status
   created_at: string; // timestamp with time zone
   updated_at: string; // timestamp with time zone
@@ -23,6 +25,8 @@ export interface BookingInsertInput {
   total_nights: number;
   guests_count?: number;
   total_price: number;
+  tax_fee?: number;
+  service_fee?: number;
   status?: BookingStatus;
 }
 

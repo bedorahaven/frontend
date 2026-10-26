@@ -32,6 +32,7 @@ import type {
   PropertyWithMedia,
 } from "@/types/properties";
 import { createProperty, updateProperty } from "@/lib/api/properties";
+import { calculateBookingPrice } from "@/lib/booking-pricing";
 import { RichTextEditor } from "../ui/rich-text-editor";
 
 interface HostOption {
@@ -199,6 +200,11 @@ export function ListingForm({
     })) ?? [],
   );
   const mediaCounts = getMediaCounts(media);
+  const listingPrice = Number(pricePerNight);
+  const pricePreview =
+    Number.isFinite(listingPrice) && listingPrice > 0
+      ? calculateBookingPrice(listingPrice, 1, 1)
+      : null;
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -891,6 +897,43 @@ export function ListingForm({
               />
             </div>
           </div>
+          {pricePreview && (
+            <div className="rounded-xl border border-border bg-muted/30 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold">Guest price preview</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Example for one night and one or two guests
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-muted-foreground">
+                  Host payout excludes fees
+                </span>
+              </div>
+              <dl className="mt-4 space-y-2 text-xs">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Accommodation</dt>
+                  <dd>KSh {pricePreview.accommodationTotal.toLocaleString()}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Service fee (3%)</dt>
+                  <dd>KSh {pricePreview.serviceFee.toLocaleString()}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Tax (16%)</dt>
+                  <dd>KSh {pricePreview.taxFee.toLocaleString()}</dd>
+                </div>
+                <div className="flex justify-between gap-4 border-t border-border pt-2 font-semibold">
+                  <dt>Guest total</dt>
+                  <dd>KSh {pricePreview.total.toLocaleString()}</dd>
+                </div>
+                <div className="flex justify-between gap-4 font-semibold text-emerald-700 dark:text-emerald-400">
+                  <dt>Your payout</dt>
+                  <dd>KSh {pricePreview.hostPayout.toLocaleString()}</dd>
+                </div>
+              </dl>
+            </div>
+          )}
         </div>
 
         {/* Amenities */}

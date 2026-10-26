@@ -92,7 +92,9 @@ async function getEarningsForRole(adminMode: boolean): Promise<HostEarningsData>
   for (let offset = 0; ; offset += QUERY_PAGE_SIZE) {
     let bookingsQuery = supabase
       .from("bookings")
-      .select("id, property_id, guest_id, check_in, check_out, guests_count, total_nights")
+      .select(
+        "id, property_id, guest_id, check_in, check_out, guests_count, total_nights, total_price, tax_fee, service_fee",
+      )
       .order("id")
       .range(offset, offset + QUERY_PAGE_SIZE - 1);
 
@@ -188,6 +190,10 @@ async function getEarningsForRole(adminMode: boolean): Promise<HostEarningsData>
       const property = booking ? propertyById.get(booking.property_id) ?? null : null;
       return {
         ...transaction,
+        amount:
+          !adminMode && transaction.status === "completed" && booking
+            ? getHostNetPayment(transaction.amount, booking)
+            : transaction.amount,
         booking: booking ?? null,
         property: property
           ? {
@@ -202,4 +208,25 @@ async function getEarningsForRole(adminMode: boolean): Promise<HostEarningsData>
       };
     }),
   };
+}
+
+function getHostNetPayment(
+  paymentAmount: number,
+  booking: HostEarningsBooking,
+): number {
+  const bookingTotal = Number(booking.total_price);
+  const fees = Number(booking.tax_fee || 0) + Number(booking.service_fee || 0);
+  const accommodationTotal = bookingTotal - fees;
+
+  if (
+    !Number.isFinite(paymentAmount) ||
+    !Number.isFinite(bookingTotal) ||
+    !Number.isFinite(accommodationTotal) ||
+    bookingTotal <= 0 ||
+    accommodationTotal < 0
+  ) {
+    return paymentAmount;
+  }
+
+  return Math.round((paymentAmount * accommodationTotal / bookingTotal) * 100) / 100;
 }

@@ -97,6 +97,17 @@ export async function POST(request: Request) {
     typeof metadata.check_out === "string" &&
     typeof metadata.total_nights === "number" &&
     typeof metadata.guests_count === "number" &&
+    typeof metadata.accommodation_total === "number" &&
+    Number.isSafeInteger(metadata.accommodation_total) &&
+    typeof metadata.service_fee === "number" &&
+    Number.isSafeInteger(metadata.service_fee) &&
+    typeof metadata.tax_fee === "number" &&
+    Number.isSafeInteger(metadata.tax_fee) &&
+    typeof metadata.total_amount === "number" &&
+    Number.isSafeInteger(metadata.total_amount) &&
+    metadata.accommodation_total + metadata.service_fee + metadata.tax_fee ===
+      metadata.total_amount &&
+    transaction.amount === metadata.total_amount * 100 &&
     isRecord(customer) &&
     typeof customer.email === "string";
 
@@ -163,6 +174,21 @@ export async function POST(request: Request) {
           "Paystack received your payment, but we could not confirm the booking yet. Please contact support with your payment reference.",
       },
       { status: 503 },
+    );
+  }
+
+  const { error: feePersistenceError } = await admin
+    .from("bookings")
+    .update({
+      service_fee: metadata.service_fee,
+      tax_fee: metadata.tax_fee,
+    })
+    .eq("id", finalizedData.booking_id);
+
+  if (feePersistenceError) {
+    console.error(
+      "Verified Paystack booking fee persistence failed:",
+      feePersistenceError.message,
     );
   }
 
@@ -244,6 +270,9 @@ export async function POST(request: Request) {
     amount: transaction.amount,
     currency: transaction.currency,
     booking_confirmed: true,
+    settlement_warning: feePersistenceError
+      ? "Your booking is confirmed, but its settlement details could not be saved. Please contact support."
+      : null,
     host_notification: notificationStatus,
     account_contact: customer.email,
     notification_warning:

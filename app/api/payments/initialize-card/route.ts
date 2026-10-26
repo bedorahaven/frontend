@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { calculateBookingPrice } from "@/lib/booking-pricing";
 import { createClient } from "@/utils/supabase/server";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -133,14 +134,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const guestMultiplier =
-    guestsCount > 2 ? 1 + (guestsCount - 2) * 0.05 : 1;
-  const nightlyRate = Math.round(basePrice * guestMultiplier);
-  const serviceFee = basePrice * 0.03;
-  const tax = (basePrice + serviceFee) * 0.16;
-  const totalAmount =
-    nightlyRate * totalNights + tax + serviceFee;
-  const amountInMinorUnits = Math.round(totalAmount * 100);
+  const pricing = calculateBookingPrice(basePrice, totalNights, guestsCount);
+  const amountInMinorUnits = pricing.total * 100;
 
   if (!Number.isSafeInteger(amountInMinorUnits) || amountInMinorUnits <= 0) {
     return NextResponse.json(
@@ -171,6 +166,10 @@ export async function POST(request: Request) {
           check_out: checkOutDate,
           total_nights: totalNights,
           guests_count: guestsCount,
+          accommodation_total: pricing.accommodationTotal,
+          service_fee: pricing.serviceFee,
+          tax_fee: pricing.taxFee,
+          total_amount: pricing.total,
         },
       }),
       cache: "no-store",

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { sendHostBookingNotification } from '@/lib/email';
+import { calculateBookingPrice } from '@/lib/booking-pricing';
 
 export interface Booking {
   id: string;
@@ -12,6 +13,8 @@ export interface Booking {
   total_nights: number;
   guests_count: number;
   total_price: number;
+  tax_fee: number;
+  service_fee: number;
   status: 'pending' | 'confirmed' | 'cancelled';
   payment_method: 'mpesa' | 'paystack';
   guest_email?: string;
@@ -69,6 +72,32 @@ export async function createBooking(payload: {
     }
 
     const supabase = await createClient();
+    const { data: pricingProperty, error: pricingPropertyError } = await supabase
+      .from('properties')
+      .select('price_per_night, max_guests, is_active')
+      .eq('id', payload.property_id)
+      .maybeSingle();
+
+    if (pricingPropertyError) {
+      console.error('Booking price lookup failed:', pricingPropertyError.message);
+      throw new Error('Unable to verify this property’s price.');
+    }
+    if (!pricingProperty || pricingProperty.is_active !== true) {
+      throw new Error('This property is unavailable for booking.');
+    }
+    if (
+      typeof pricingProperty.max_guests !== 'number' ||
+      payload.guests_count < 1 ||
+      payload.guests_count > pricingProperty.max_guests
+    ) {
+      throw new Error('Guest count exceeds this property’s capacity.');
+    }
+
+    const pricing = calculateBookingPrice(
+      Number(pricingProperty.price_per_night),
+      payload.total_nights,
+      payload.guests_count,
+    );
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -81,7 +110,7 @@ export async function createBooking(payload: {
         p_check_out: payload.check_out,
         p_total_nights: payload.total_nights,
         p_guests_count: payload.guests_count,
-        p_total_price: payload.total_price,
+        p_total_price: pricing.total,
         p_payment_method: payload.payment_method,
         p_guest_email: payload.guest_email || null,
         p_phone_number: payload.phone_number || null,
@@ -102,6 +131,17 @@ export async function createBooking(payload: {
       throw new Error('Booking could not be created.');
     }
 
+    let pricingWarning: string | undefined;
+    const { error: feeError } = await supabase.rpc(
+      'reconcile_booking_fees',
+      { p_booking_id: bookingId },
+    );
+    if (feeError) {
+      console.error('Booking fee persistence failed:', feeError.message);
+      pricingWarning =
+        'Your booking was created, but its settlement details could not be saved. Please contact support.';
+    }
+
     const booking: Booking = {
       id: bookingId,
       property_id: payload.property_id,
@@ -110,7 +150,9 @@ export async function createBooking(payload: {
       check_out: payload.check_out,
       total_nights: payload.total_nights,
       guests_count: payload.guests_count,
-      total_price: payload.total_price,
+      total_price: pricing.total,
+      tax_fee: pricing.taxFee,
+      service_fee: pricing.serviceFee,
       status: 'confirmed',
       payment_method: payload.payment_method,
       guest_email: payload.guest_email,
@@ -128,7 +170,9 @@ export async function createBooking(payload: {
       return {
         success: true,
         booking,
-        notificationWarning: 'Your booking was saved, but host details could not be loaded.',
+        notificationWarning:
+          pricingWarning ??
+          'Your booking was saved, but host details could not be loaded.',
       };
     }
 
@@ -143,7 +187,9 @@ export async function createBooking(payload: {
       return {
         success: true,
         booking,
-        notificationWarning: 'Your booking was saved, but the host email could not be looked up.',
+        notificationWarning:
+          pricingWarning ??
+          'Your booking was saved, but the host email could not be looked up.',
       };
     }
 
@@ -152,7 +198,9 @@ export async function createBooking(payload: {
       return {
         success: true,
         booking,
-        notificationWarning: 'Your booking was saved, but no host email is available.',
+        notificationWarning:
+          pricingWarning ??
+          'Your booking was saved, but no host email is available.',
       };
     }
 
@@ -167,7 +215,7 @@ export async function createBooking(payload: {
         checkIn: payload.check_in,
         checkOut: payload.check_out,
         totalNights: payload.total_nights,
-        totalPrice: payload.total_price,
+        totalPrice: pricing.total,
         paymentMethod: payload.payment_method,
       });
     } catch (error) {
@@ -175,11 +223,13 @@ export async function createBooking(payload: {
       return {
         success: true,
         booking,
-        notificationWarning: 'Your booking was saved, but the host notification email could not be sent.',
+        notificationWarning:
+          pricingWarning ??
+          'Your booking was saved, but the host notification email could not be sent.',
       };
     }
 
-    return { success: true, booking };
+    return { success: true, booking, notificationWarning: pricingWarning };
   } catch (err: unknown) {
     console.error('Booking creation error:', err);
     return {
