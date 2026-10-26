@@ -42,18 +42,33 @@ export function formatAmount(amount: number, currency: string): string {
 }
 
 
-export function formatDate(value: string): string {
-  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return "Date unavailable";
-  return new Intl.DateTimeFormat("en-KE", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
+// export function formatDate(value: string): string {
+//   const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+//   if (Number.isNaN(date.getTime())) return "Date unavailable";
+//   return new Intl.DateTimeFormat("en-KE", {
+//     day: "numeric",
+//     month: "short",
+//     year: "numeric",
+//   }).format(date);
+// }
 
 export function formatStatus(status: string): string {
   return status
     .replaceAll("_", " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+export function formatKes(amount: number): string {
+  return new Intl.NumberFormat("en-KE", {
+    style: "currency",
+    currency: "KSh",
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function formatDate(value: string): string {
+  return new Intl.DateTimeFormat("en-KE", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }

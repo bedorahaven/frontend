@@ -17,6 +17,7 @@ import {
   updateWithdrawalRequestStatus,
   type AdminWithdrawalRequest,
 } from "@/lib/api/withdrawals";
+import { formatDate, formatKes } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
 type StatusFilter = "all" | "pending" | "completed" | "failed" | "cancelled";
@@ -311,19 +312,4 @@ function RequestStatus({ status }: { status: string }) {
       {status}
     </span>
   );
-}
-
-function formatKes(amount: number): string {
-  return new Intl.NumberFormat("en-KE", {
-    style: "currency",
-    currency: "KES",
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en-KE", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }
