@@ -5,17 +5,12 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
-  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DataFilterBar,
+  DataFilterSelect,
+} from "@/components/ui/data-filter-bar";
 import {
   Table,
   TableBody,
@@ -144,47 +139,38 @@ export function TransactionsTable({
               : "Payment history for bookings at your properties."}
           </p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-[minmax(14rem,1fr)_10rem_10rem]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => updateSearch(event.target.value)}
-              placeholder="Search property, guest, receipt, ID"
-              aria-label="Search transactions"
-              className="h-10 pl-9 text-sm"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={updateStatus}>
-            <SelectTrigger
-              aria-label="Filter transactions by status"
-              className="h-10 text-sm"
-            >
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {statuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {formatStatus(status)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={dateFilter} onValueChange={updateDate}>
-            <SelectTrigger
-              aria-label="Filter transactions by date"
-              className="h-10 text-sm"
-            >
-              <SelectValue placeholder="Any time" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any time</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-              <SelectItem value="90">Last 90 days</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <DataFilterBar
+          searchValue={search}
+          onSearchChange={updateSearch}
+          searchPlaceholder="Search property, guest, receipt, ID"
+          searchLabel="Search transactions"
+          className="sm:grid-cols-[minmax(14rem,1fr)_minmax(10rem,12rem)_minmax(10rem,12rem)]"
+        >
+          <DataFilterSelect
+            value={statusFilter}
+            onValueChange={updateStatus}
+            ariaLabel="Filter transactions by status"
+            placeholder="All statuses"
+            options={[
+              { value: "all", label: "All statuses" },
+              ...statuses.map((status) => ({
+                value: status,
+                label: formatStatus(status),
+              })),
+            ]}
+          />
+          <DataFilterSelect
+            value={dateFilter}
+            onValueChange={updateDate}
+            ariaLabel="Filter transactions by date"
+            placeholder="Any time"
+            options={[
+              { value: "all", label: "Any time" },
+              { value: "30", label: "Last 30 days" },
+              { value: "90", label: "Last 90 days" },
+            ]}
+          />
+        </DataFilterBar>
       </div>
 
       {visibleTransactions.length === 0 ? (

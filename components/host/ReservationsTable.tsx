@@ -5,19 +5,16 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Mail,
   MapPin,
-  Search,
+  Phone,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DataFilterBar,
+  DataFilterSelect,
+} from "@/components/ui/data-filter-bar";
 import {
   Table,
   TableBody,
@@ -118,34 +115,27 @@ export function ReservationsTable({
               : "Search and review the details for each guest stay."}
           </p>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <div className="relative sm:w-64">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => updateSearch(event.target.value)}
-              placeholder="Search guest, listing, or ID"
-              aria-label="Search reservations"
-              className="h-10 pl-9 text-sm"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={updateStatus}>
-            <SelectTrigger
-              aria-label="Filter by reservation status"
-              className="h-10 w-full text-sm sm:w-40"
-            >
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {statuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {formatStatus(status)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <DataFilterBar
+          searchValue={search}
+          onSearchChange={updateSearch}
+          searchPlaceholder="Search guest, listing, or ID"
+          searchLabel="Search reservations"
+          className="sm:grid-cols-[minmax(14rem,1fr)_minmax(10rem,12rem)]"
+        >
+          <DataFilterSelect
+            value={statusFilter}
+            onValueChange={updateStatus}
+            ariaLabel="Filter by reservation status"
+            placeholder="All statuses"
+            options={[
+              { value: "all", label: "All statuses" },
+              ...statuses.map((status) => ({
+                value: status,
+                label: formatStatus(status),
+              })),
+            ]}
+          />
+        </DataFilterBar>
       </div>
 
       {visibleReservations.length === 0 ? (
@@ -253,14 +243,6 @@ export function ReservationsTable({
                       {formatPrice(reservation.total_price)}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Booking ID
-                    </p>
-                    <p className="mt-1 font-mono text-xs text-foreground">
-                      #{reservation.id.slice(0, 8)}
-                    </p>
-                  </div>
                 </div>
               </article>
             ))}
@@ -353,8 +335,9 @@ function GuestListing({
       {(reservation.guest?.email || getString(reservation.guest_email)) && (
         <a
           href={`mailto:${reservation.guest?.email || getString(reservation.guest_email)}`}
-          className="mt-1 block truncate text-[11px] text-accent hover:underline"
+          className="mt-1 flex min-w-0 items-center gap-1.5 truncate text-[11px] text-accent hover:underline"
         >
+          <Mail className="size-3 shrink-0" aria-hidden="true" />
           {reservation.guest?.email || getString(reservation.guest_email)}
         </a>
       )}
@@ -362,10 +345,9 @@ function GuestListing({
         getString(reservation.phone_number)) && (
         <a
           href={`tel:${reservation.guest?.phone_number || getString(reservation.phone_number)}`}
-          className="mt-1 block text-[11px] text-accent hover:underline"
+          className="mt-1 flex items-center gap-1.5 text-[11px] text-accent hover:underline"
         >
-          {" "}
-          Phone:
+          <Phone className="size-3 shrink-0" aria-hidden="true" />
           {reservation.guest?.phone_number ||
             getString(reservation.phone_number)}
         </a>
